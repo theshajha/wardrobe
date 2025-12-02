@@ -114,67 +114,67 @@ export default function Outfits() {
   }
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Shirt className="h-8 w-8 text-primary" />
-            Outfit Combinations
+    <div className="p-4 md:p-8 space-y-4 md:space-y-8">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 md:gap-3">
+            <Shirt className="h-6 w-6 md:h-8 md:w-8 text-primary shrink-0" />
+            <span className="truncate">Outfits</span>
           </h1>
-          <p className="text-muted-foreground mt-1">Create and save outfit combinations from your wardrobe</p>
+          <p className="text-muted-foreground mt-1 text-sm hidden sm:block">Create and save outfit combinations from your wardrobe</p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+        <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 shrink-0">
           <Plus className="h-4 w-4" />
-          Create Outfit
+          <span className="hidden sm:inline">Create</span>
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Saved Outfits</p>
-                <p className="text-2xl font-bold">{outfits.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Outfits</p>
+                <p className="text-xl md:text-2xl font-bold">{outfits.length}</p>
               </div>
-              <Shirt className="h-8 w-8 text-primary opacity-50" />
+              <Shirt className="h-6 w-6 md:h-8 md:w-8 text-primary opacity-50" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Tops Available</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs md:text-sm text-muted-foreground">Tops</p>
+                <p className="text-xl md:text-2xl font-bold">
                   {clothingItems.filter((i) => ['T-Shirts', 'Shirts', 'Hoodies', 'Sweaters'].includes(i.subcategory || '')).length}
                 </p>
               </div>
-              <Shirt className="h-8 w-8 text-blue-500 opacity-50" />
+              <Shirt className="h-6 w-6 md:h-8 md:w-8 text-blue-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Bottoms Available</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs md:text-sm text-muted-foreground">Bottoms</p>
+                <p className="text-xl md:text-2xl font-bold">
                   {clothingItems.filter((i) => ['Pants', 'Shorts', 'Skirts'].includes(i.subcategory || '')).length}
                 </p>
               </div>
-              <Package className="h-8 w-8 text-purple-500 opacity-50" />
+              <Package className="h-6 w-6 md:h-8 md:w-8 text-purple-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Accessories</p>
-                <p className="text-2xl font-bold">{accessoryItems.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Accessories</p>
+                <p className="text-xl md:text-2xl font-bold">{accessoryItems.length}</p>
               </div>
-              <Watch className="h-8 w-8 text-amber-500 opacity-50" />
+              <Watch className="h-6 w-6 md:h-8 md:w-8 text-amber-500 opacity-50" />
             </div>
           </CardContent>
         </Card>

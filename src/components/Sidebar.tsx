@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Package, Plane, Settings, Shirt, Sparkles, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Menu, Package, Plane, Settings, Shirt, Sparkles, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 // Navigation grouped by workflow
@@ -32,14 +33,14 @@ const navGroups = [
   },
 ];
 
-export function Sidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
 
   return (
-    <aside className="w-64 h-screen sticky top-0 border-r bg-card/50 backdrop-blur-xl flex flex-col">
+    <>
       {/* Logo */}
-      <div className="p-6 shrink-0">
-        <Link to="/dashboard" className="flex items-center gap-3">
+      <div className="p-4 md:p-6 shrink-0">
+        <Link to="/dashboard" className="flex items-center gap-3" onClick={onNavigate}>
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
             <Package className="h-5 w-5 text-black" />
           </div>
@@ -53,7 +54,7 @@ export function Sidebar() {
       <div className="h-px bg-border shrink-0" />
 
       {/* Navigation with groups */}
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+      <nav className="flex-1 p-3 md:p-4 space-y-4 md:space-y-6 overflow-y-auto">
         {navGroups.map((group, groupIndex) => (
           <div key={group.label}>
             {/* Section label */}
@@ -69,6 +70,7 @@ export function Sidebar() {
                   <Link
                     key={item.name}
                     to={item.href}
+                    onClick={onNavigate}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
                       isActive
@@ -94,9 +96,10 @@ export function Sidebar() {
       <div className="h-px bg-border shrink-0" />
 
       {/* Settings - Always at bottom */}
-      <div className="p-4 shrink-0">
+      <div className="p-3 md:p-4 shrink-0">
         <Link
           to="/settings"
+          onClick={onNavigate}
           className={cn(
             'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
             location.pathname === '/settings'
@@ -108,6 +111,59 @@ export function Sidebar() {
           Settings
         </Link>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-xl border-b h-14 flex items-center px-4">
+        <button
+          onClick={() => setIsMobileOpen(true)}
+          className="p-2 -ml-2 rounded-lg hover:bg-secondary"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2 ml-2">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+            <Package className="h-4 w-4 text-black" />
+          </div>
+          <span className="font-bold">Nomad</span>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/50"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Drawer */}
+      <aside
+        className={cn(
+          'md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-card border-r flex flex-col transform transition-transform duration-200',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <button
+          onClick={() => setIsMobileOpen(false)}
+          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-secondary"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <SidebarContent onNavigate={() => setIsMobileOpen(false)} />
+      </aside>
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 h-screen sticky top-0 border-r bg-card/50 backdrop-blur-xl flex-col">
+        <SidebarContent />
+      </aside>
+    </>
   );
 }

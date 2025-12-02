@@ -116,75 +116,75 @@ export default function Dashboard() {
   const greeting = userName ? `Welcome back, ${userName}` : 'Welcome back, Nomad'
 
   return (
-    <div className="p-8 space-y-8 animate-fade-in">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight">{greeting}</h1>
-        <p className="text-muted-foreground text-lg">
+      <div className="space-y-1 md:space-y-2">
+        <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{greeting}</h1>
+        <p className="text-muted-foreground text-sm md:text-lg">
           Your wardrobe at a glance. {items.length} items tracked.
         </p>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-3xl font-bold">{items.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total Items</p>
+                <p className="text-2xl md:text-3xl font-bold">{items.length}</p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                <Package className="h-6 w-6 text-black" />
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Package className="h-5 w-5 md:h-6 md:w-6 text-black" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Phase Out</p>
-                <p className="text-3xl font-bold">{phaseOutCount}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Phase Out</p>
+                <p className="text-2xl md:text-3xl font-bold">{phaseOutCount}</p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Worth</p>
-                <p className={`font-bold ${currencies.length > 1 ? 'text-xl' : 'text-3xl'}`}>
+                <p className="text-xs md:text-sm text-muted-foreground">Total Worth</p>
+                <p className={`font-bold ${currencies.length > 1 ? 'text-base md:text-xl' : 'text-2xl md:text-3xl'}`}>
                   {totalWorthDisplay}
                 </p>
                 {itemsWithCost > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {itemsWithCost} of {items.length} items priced
+                  <p className="text-[10px] md:text-xs text-muted-foreground mt-1 hidden md:block">
+                    {itemsWithCost} of {items.length} priced
                   </p>
                 )}
               </div>
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center">
+                <DollarSign className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Trips</p>
-                <p className="text-3xl font-bold">{activeTrips.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Active Trips</p>
+                <p className="text-2xl md:text-3xl font-bold">{activeTrips.length}</p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
-                <MapPin className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
+                <MapPin className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -192,7 +192,7 @@ export default function Dashboard() {
       </div>
 
       {/* Categories Overview + Recently Added */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

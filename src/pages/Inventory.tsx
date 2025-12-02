@@ -410,22 +410,22 @@ export default function Inventory() {
   })
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-muted-foreground">Manage all your belongings in one place</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory</h1>
+          <p className="text-muted-foreground text-sm md:text-base hidden sm:block">Manage all your belongings in one place</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 shrink-0">
           <Plus className="h-4 w-4" />
-          Add Item
+          <span className="hidden sm:inline">Add Item</span>
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search items..."
@@ -435,37 +435,39 @@ export default function Inventory() {
           />
         </div>
 
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {CATEGORIES.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={conditionFilter} onValueChange={setConditionFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Condition" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Conditions</SelectItem>
-            {CONDITIONS.map((cond) => (
-              <SelectItem key={cond.id} value={cond.id}>{cond.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={conditionFilter} onValueChange={setConditionFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Condition" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Conditions</SelectItem>
+              {CONDITIONS.map((cond) => (
+                <SelectItem key={cond.id} value={cond.id}>{cond.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="flex gap-1 border rounded-lg p-1">
-          <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}>
-            <Grid3X3 className="h-4 w-4" />
-          </Button>
-          <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}>
-            <List className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-1 border rounded-lg p-1 shrink-0">
+            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('grid')}>
+              <Grid3X3 className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('list')}>
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -489,7 +491,7 @@ export default function Inventory() {
           </Button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {filteredItems.map((item) => {
             const Icon = categoryIcons[item.category] || Package
             const age = getItemAge(item.purchaseDate)
@@ -511,24 +513,24 @@ export default function Inventory() {
                       "aspect-square flex items-center justify-center bg-gradient-to-br",
                       categoryColors[item.category] || 'from-gray-400 to-gray-500'
                     )}>
-                      <Icon className="h-12 w-12 text-white/80" />
+                      <Icon className="h-8 md:h-12 w-8 md:w-12 text-white/80" />
                     </div>
                   )}
 
-                  {/* Action buttons overlay - visible on hover */}
-                  <div className="absolute inset-x-0 top-0 p-2 flex justify-between items-start opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Action buttons overlay - always visible on mobile, hover on desktop */}
+                  <div className="absolute inset-x-0 top-0 p-1.5 md:p-2 flex justify-between items-start md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {/* Left: Star button */}
                     <Button
                       variant="secondary"
                       size="icon"
                       className={cn(
-                        "h-8 w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0",
+                        "h-7 w-7 md:h-8 md:w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0",
                         item.isFeatured && "bg-amber-500 hover:bg-amber-600 text-black"
                       )}
                       onClick={(e) => toggleFeatured(item, e)}
                       title={item.isFeatured ? "Remove from showcase" : "Add to showcase"}
                     >
-                      <Star className={cn("h-4 w-4", item.isFeatured && "fill-current")} />
+                      <Star className={cn("h-3.5 w-3.5 md:h-4 md:w-4", item.isFeatured && "fill-current")} />
                     </Button>
 
                     {/* Right: Copy and Edit buttons */}
@@ -536,55 +538,55 @@ export default function Inventory() {
                       <Button
                         variant="secondary"
                         size="icon"
-                        className="h-8 w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0"
+                        className="h-7 w-7 md:h-8 md:w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0"
                         onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
                         title="Duplicate item"
                       >
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-3.5 w-3.5 md:h-4 md:w-4" />
                       </Button>
                       <Button
                         variant="secondary"
                         size="icon"
-                        className="h-8 w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0"
+                        className="h-7 w-7 md:h-8 md:w-8 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0"
                         onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
                         title="Edit item"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
                       </Button>
                     </div>
                   </div>
 
                   {/* Featured indicator (always visible when featured) */}
                   {item.isFeatured && (
-                    <div className="absolute bottom-2 left-2">
-                      <div className="h-6 w-6 rounded-full bg-amber-500 flex items-center justify-center shadow-lg">
-                        <Star className="h-3.5 w-3.5 text-black fill-current" />
+                    <div className="absolute bottom-1.5 left-1.5 md:bottom-2 md:left-2">
+                      <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-amber-500 flex items-center justify-center shadow-lg">
+                        <Star className="h-3 w-3 md:h-3.5 md:w-3.5 text-black fill-current" />
                       </div>
                     </div>
                   )}
                 </div>
 
-                <CardContent className="p-4">
-                  <div className="mb-2">
-                    <h3 className="font-semibold truncate">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground">
+                <CardContent className="p-2.5 md:p-4">
+                  <div className="mb-1.5 md:mb-2">
+                    <h3 className="font-semibold truncate text-sm md:text-base">{item.name}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">
                       {item.subcategory || item.category}
                       {item.brand && ` • ${item.brand}`}
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant={age.status}>{age.label}</Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={age.status} className="text-[10px] md:text-xs">{age.label}</Badge>
                     {sizeDisplay !== '—' && (
-                      <Badge variant="secondary" className="gap-1">
-                        <Ruler className="h-3 w-3" />
+                      <Badge variant="secondary" className="gap-0.5 text-[10px] md:text-xs hidden sm:flex">
+                        <Ruler className="h-2.5 w-2.5 md:h-3 md:w-3" />
                         {sizeDisplay}
                       </Badge>
                     )}
                     {item.isPhaseOut && (
-                      <Badge variant="destructive" className="gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        Phase out
+                      <Badge variant="destructive" className="gap-0.5 text-[10px] md:text-xs">
+                        <AlertTriangle className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                        <span className="hidden sm:inline">Phase out</span>
                       </Badge>
                     )}
                     {item.location !== 'home' && (

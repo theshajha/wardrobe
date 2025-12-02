@@ -178,12 +178,29 @@ export default function Packing() {
   const tripItemIds = selectedTrip?.tripItems.map((ti) => ti.itemId) || []
   const availableItems = items.filter((item) => !tripItemIds.includes(item.id))
 
+  // Mobile: show trip list or trip detail based on selection
+  const [showTripList, setShowTripList] = useState(true)
+
+  // On mobile, when a trip is selected, show the detail view
+  const handleSelectTrip = (trip: TripWithItems) => {
+    setSelectedTrip(trip)
+    setShowTripList(false)
+  }
+
+  // On mobile, go back to trip list
+  const handleBackToList = () => {
+    setShowTripList(true)
+  }
+
   return (
-    <div className="flex h-[calc(100vh-0px)]">
-      {/* Trips List Sidebar */}
-      <div className="w-80 border-r bg-card/50 flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-3.5rem)] md:h-screen">
+      {/* Trips List Sidebar - hidden on mobile when viewing a trip */}
+      <div className={cn(
+        "w-full md:w-80 border-b md:border-b-0 md:border-r bg-card/50 flex flex-col",
+        !showTripList && "hidden md:flex"
+      )}>
+        <div className="p-3 md:p-4 border-b">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Trips</h2>
             <Button size="sm" onClick={() => setIsTripDialogOpen(true)}>
               <Plus className="h-4 w-4" />
@@ -213,7 +230,7 @@ export default function Packing() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => handleSelectTrip(trip)}
                     className={cn(
                       'p-3 rounded-lg cursor-pointer transition-all group',
                       isSelected ? 'bg-primary/10 border border-primary/50' : 'hover:bg-secondary border border-transparent'
@@ -255,14 +272,25 @@ export default function Packing() {
         </ScrollArea>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      {/* Main Content - full width on mobile */}
+      <div className={cn(
+        "flex-1 overflow-auto",
+        showTripList && "hidden md:block"
+      )}>
         {selectedTrip ? (
-          <div className="p-8 space-y-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">{selectedTrip.name}</h1>
-                <div className="flex items-center gap-4 mt-2 text-muted-foreground">
+          <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+            {/* Mobile back button */}
+            <button
+              onClick={handleBackToList}
+              className="md:hidden flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-2"
+            >
+              ← Back to trips
+            </button>
+
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{selectedTrip.name}</h1>
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-2 text-sm text-muted-foreground">
                   {selectedTrip.destination && (
                     <span className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
@@ -284,32 +312,32 @@ export default function Packing() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handleEditTrip(selectedTrip)}>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit Trip
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={() => handleEditTrip(selectedTrip)}>
+                  <Pencil className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
-                <Button onClick={() => setIsAddItemsDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Items
+                <Button size="sm" onClick={() => setIsAddItemsDialogOpen(true)}>
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Add Items</span>
                 </Button>
               </div>
             </div>
 
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Packing Progress</p>
-                    <p className="text-2xl font-bold">
-                      {selectedTrip.tripItems.filter((i) => i.packed).length} / {selectedTrip.tripItems.length} items packed
+                    <p className="text-xs md:text-sm text-muted-foreground">Packing Progress</p>
+                    <p className="text-lg md:text-2xl font-bold">
+                      {selectedTrip.tripItems.filter((i) => i.packed).length} / {selectedTrip.tripItems.length} packed
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-4xl font-bold text-primary">{getPackingProgress(selectedTrip)}%</p>
+                    <p className="text-3xl md:text-4xl font-bold text-primary">{getPackingProgress(selectedTrip)}%</p>
                   </div>
                 </div>
-                <Progress value={getPackingProgress(selectedTrip)} className="h-3" />
+                <Progress value={getPackingProgress(selectedTrip)} className="h-2 md:h-3" />
               </CardContent>
             </Card>
 

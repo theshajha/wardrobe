@@ -63,45 +63,45 @@ export default function PhaseOut() {
     const age = getItemAge(item.purchaseDate)
 
     return (
-      <div key={item.id} className="flex items-center gap-4 p-4 rounded-lg border hover:bg-secondary/50 transition-colors group">
+      <div key={item.id} className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border hover:bg-secondary/50 transition-colors group">
         {item.imageData ? (
-          <img src={item.imageData} alt={item.name} className="h-12 w-12 rounded-xl object-cover" />
+          <img src={item.imageData} alt={item.name} className="h-10 w-10 md:h-12 md:w-12 rounded-xl object-cover shrink-0" />
         ) : (
-          <div className={cn('h-12 w-12 rounded-xl bg-gradient-to-br flex items-center justify-center shrink-0', categoryColors[item.category] || 'from-gray-400 to-gray-500')}>
-            <Icon className="h-6 w-6 text-white" />
+          <div className={cn('h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br flex items-center justify-center shrink-0', categoryColors[item.category] || 'from-gray-400 to-gray-500')}>
+            <Icon className="h-5 w-5 md:h-6 md:w-6 text-white" />
           </div>
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{item.name}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-medium truncate text-sm md:text-base">{item.name}</p>
+          <p className="text-xs md:text-sm text-muted-foreground truncate">
             {item.subcategory || item.category}
             {item.brand && ` • ${item.brand}`}
           </p>
           {item.purchaseDate && (
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
               <Clock className="h-3 w-3 inline mr-1" />
-              Purchased {formatDate(item.purchaseDate)}
+              {formatDate(item.purchaseDate)}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Badge variant={age.status}>{age.label} old</Badge>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <Badge variant={age.status} className="text-[10px] md:text-xs hidden sm:inline-flex">{age.label}</Badge>
 
           {showRemoveFromList ? (
-            <Button variant="outline" size="sm" onClick={() => handleTogglePhaseOut(item)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Keep
+            <Button variant="outline" size="sm" onClick={() => handleTogglePhaseOut(item)} className="h-8 px-2 md:px-3 text-xs md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+              <RefreshCw className="h-3.5 w-3.5 md:mr-1" />
+              <span className="hidden md:inline">Keep</span>
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => handleTogglePhaseOut(item)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              Phase Out
+            <Button variant="outline" size="sm" onClick={() => handleTogglePhaseOut(item)} className="h-8 px-2 md:px-3 text-xs md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+              <AlertTriangle className="h-3.5 w-3.5 md:mr-1" />
+              <span className="hidden md:inline">Phase Out</span>
             </Button>
           )}
 
-          <Button variant="ghost" size="icon" onClick={() => setDeleteItem(item)} className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive">
+          <Button variant="ghost" size="icon" onClick={() => setDeleteItem(item)} className="h-8 w-8 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-destructive">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -118,53 +118,53 @@ export default function PhaseOut() {
   }
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <AlertTriangle className="h-8 w-8 text-amber-500" />
-          Phase Out Tracker
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 md:gap-3">
+          <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-amber-500" />
+          Phase Out
         </h1>
-        <p className="text-muted-foreground mt-1">Track items that need replacement and manage your wardrobe lifecycle</p>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base hidden sm:block">Track items that need replacement</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         <Card className="bg-red-500/5 border-red-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
+          <CardContent className="p-3 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-red-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Ready to Replace</p>
-                <p className="text-3xl font-bold text-red-500">{phaseOutItems.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Replace</p>
+                <p className="text-2xl md:text-3xl font-bold text-red-500">{phaseOutItems.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-amber-500/5 border-amber-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-amber-500" />
+          <CardContent className="p-3 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                <Clock className="h-5 w-5 md:h-6 md:w-6 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Needs Replacement</p>
-                <p className="text-3xl font-bold text-amber-500">{needsReplacementItems.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Needs Work</p>
+                <p className="text-2xl md:text-3xl font-bold text-amber-500">{needsReplacementItems.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-orange-500/5 border-orange-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                <RefreshCw className="h-6 w-6 text-orange-500" />
+          <CardContent className="p-3 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+              <div className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
+                <RefreshCw className="h-5 w-5 md:h-6 md:w-6 text-orange-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Aging Items</p>
-                <p className="text-3xl font-bold text-orange-500">{agingItems.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Aging</p>
+                <p className="text-2xl md:text-3xl font-bold text-orange-500">{agingItems.length}</p>
               </div>
             </div>
           </CardContent>

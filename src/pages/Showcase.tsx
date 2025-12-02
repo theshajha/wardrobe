@@ -340,33 +340,35 @@ export default function Showcase() {
     const nonFeaturedItems = items.filter(item => !item.isFeatured)
 
     return (
-        <div className="p-8 space-y-8">
+        <div className="p-4 md:p-8 space-y-4 md:space-y-8">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <Sparkles className="h-8 w-8 text-amber-400" />
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 md:gap-3">
+                        <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-amber-400" />
                         Showcase
                     </h1>
-                    <p className="text-muted-foreground">Feature your best items and share them with others</p>
+                    <p className="text-muted-foreground text-sm md:text-base hidden sm:block">Feature your best items and share them</p>
                 </div>
                 <div className="flex gap-2">
                     <Button
                         variant="outline"
+                        size="sm"
                         onClick={handleGenerateShareUrl}
                         disabled={featuredItems.length === 0}
                         className="gap-2"
                     >
                         <Link2 className="h-4 w-4" />
-                        Share Link
+                        <span className="hidden sm:inline">Share</span>
                     </Button>
                     <Button
+                        size="sm"
                         onClick={() => setShowExportDialog(true)}
                         disabled={featuredItems.length === 0}
                         className="gap-2"
                     >
                         <Download className="h-4 w-4" />
-                        Export HTML
+                        <span className="hidden sm:inline">Export</span>
                     </Button>
                 </div>
             </div>
