@@ -247,7 +247,27 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [subcategoryFilter, setSubcategoryFilter] = useState<string>('all')
   const [conditionFilter, setConditionFilter] = useState<string>('all')
+
+  // Get available subcategories based on category filter
+  const availableSubcategories = useMemo(() => {
+    if (categoryFilter === 'all') {
+      // Get all subcategories from all categories
+      return Object.entries(SUBCATEGORIES).flatMap(([cat, subs]) =>
+        subs.map(sub => ({ category: cat, name: sub }))
+      )
+    }
+    return (SUBCATEGORIES[categoryFilter] || []).map(sub => ({
+      category: categoryFilter,
+      name: sub
+    }))
+  }, [categoryFilter])
+
+  // Reset subcategory filter when category changes
+  useEffect(() => {
+    setSubcategoryFilter('all')
+  }, [categoryFilter])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
@@ -405,8 +425,9 @@ export default function Inventory() {
       item.brand?.toLowerCase().includes(search.toLowerCase()) ||
       item.subcategory?.toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
+    const matchesSubcategory = subcategoryFilter === 'all' || item.subcategory === subcategoryFilter
     const matchesCondition = conditionFilter === 'all' || item.condition === conditionFilter
-    return matchesSearch && matchesCategory && matchesCondition
+    return matchesSearch && matchesCategory && matchesSubcategory && matchesCondition
   })
 
   return (
@@ -435,9 +456,9 @@ export default function Inventory() {
           />
         </div>
 
-        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex gap-2 flex-wrap">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectTrigger className="w-[130px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -448,8 +469,22 @@ export default function Inventory() {
             </SelectContent>
           </Select>
 
+          <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {availableSubcategories.map((sub) => (
+                <SelectItem key={`${sub.category}-${sub.name}`} value={sub.name}>
+                  {sub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={conditionFilter} onValueChange={setConditionFilter}>
-            <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Condition" />
             </SelectTrigger>
             <SelectContent>

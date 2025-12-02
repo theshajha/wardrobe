@@ -60,12 +60,29 @@ export interface Outfit {
     createdAt: string;
 }
 
+export interface WishlistItem {
+    id: string;
+    name: string;
+    category?: string;
+    quantity: number;
+    priority: 'low' | 'medium' | 'high';
+    estimatedCost?: number;
+    currency?: string;
+    link?: string;
+    notes?: string;
+    isPurchased: boolean;
+    purchasedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 // Database class
 class WardrobeDatabase extends Dexie {
     items!: EntityTable<Item, 'id'>;
     trips!: EntityTable<Trip, 'id'>;
     tripItems!: EntityTable<TripItem, 'id'>;
     outfits!: EntityTable<Outfit, 'id'>;
+    wishlist!: EntityTable<WishlistItem, 'id'>;
 
     constructor() {
         super('NomadWardrobe');
@@ -93,6 +110,15 @@ class WardrobeDatabase extends Dexie {
             tripItems: 'id, tripId, itemId',
             outfits: 'id, name, occasion, createdAt',
         });
+
+        // Version 4: Added wishlist
+        this.version(4).stores({
+            items: 'id, name, category, condition, location, isPhaseOut, isFeatured, createdAt',
+            trips: 'id, name, status, createdAt',
+            tripItems: 'id, tripId, itemId',
+            outfits: 'id, name, occasion, createdAt',
+            wishlist: 'id, name, category, priority, isPurchased, createdAt',
+        });
     }
 }
 
@@ -108,11 +134,12 @@ export async function exportAllData() {
     const trips = await db.trips.toArray();
     const tripItems = await db.tripItems.toArray();
     const outfits = await db.outfits.toArray();
+    const wishlist = await db.wishlist.toArray();
 
     return {
-        version: '2.0',
+        version: '2.1',
         exportedAt: new Date().toISOString(),
-        data: { items, trips, tripItems, outfits },
+        data: { items, trips, tripItems, outfits, wishlist },
     };
 }
 
@@ -122,9 +149,10 @@ export async function importAllData(data: {
         trips?: Trip[];
         tripItems?: TripItem[];
         outfits?: Outfit[];
+        wishlist?: WishlistItem[];
     };
 }) {
-    const results = { items: 0, trips: 0, tripItems: 0, outfits: 0 };
+    const results = { items: 0, trips: 0, tripItems: 0, outfits: 0, wishlist: 0 };
 
     if (data.data.items) {
         for (const item of data.data.items) {
@@ -166,6 +194,17 @@ export async function importAllData(data: {
                 results.outfits++;
             } catch (e) {
                 console.warn('Skipping outfit:', outfit.id);
+            }
+        }
+    }
+
+    if (data.data.wishlist) {
+        for (const wishlistItem of data.data.wishlist) {
+            try {
+                await db.wishlist.put(wishlistItem);
+                results.wishlist++;
+            } catch (e) {
+                console.warn('Skipping wishlist item:', wishlistItem.id);
             }
         }
     }

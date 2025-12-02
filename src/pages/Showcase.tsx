@@ -247,7 +247,7 @@ function generateShowcaseHTML(items: Item[], title: string, description: string)
     </div>
     
     <footer>
-      <p>Created with <a href="#">Nomad Wardrobe</a> • ${new Date().toLocaleDateString()}</p>
+      <p>Created with <a href="#">Capsule</a> • ${new Date().toLocaleDateString()}</p>
     </footer>
   </div>
 </body>

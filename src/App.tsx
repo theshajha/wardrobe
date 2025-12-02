@@ -8,6 +8,7 @@ import Packing from './pages/Packing'
 import PhaseOut from './pages/PhaseOut'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
+import Wishlist from './pages/Wishlist'
 
 function AppLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -47,6 +48,7 @@ export default function App() {
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/outfits" element={<Outfits />} />
                 <Route path="/phase-out" element={<PhaseOut />} />
+                <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/settings" element={<Settings />} />
             </Routes>
         </AppLayout>

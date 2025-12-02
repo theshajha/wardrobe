@@ -113,7 +113,7 @@ export default function Dashboard() {
     })
     .slice(0, 5)
 
-  const greeting = userName ? `Welcome back, ${userName}` : 'Welcome back, Nomad'
+  const greeting = userName ? `Welcome back, ${userName}` : 'Welcome back'
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in">

@@ -383,8 +383,8 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-1 text-sm text-muted-foreground">
-                <p><strong className="text-foreground">Nomad Wardrobe</strong> v2.2.0</p>
-                <p>Personal wardrobe management for nomads</p>
+                <p><strong className="text-foreground">Capsule</strong> v3.0.0</p>
+                <p>Manage everything you own, without the overwhelm</p>
                 <p className="text-xs mt-2">Built with React, Vite, IndexedDB & Tailwind</p>
               </div>
             </CardContent>

@@ -7,7 +7,7 @@ import { ArrowRight, Laptop, MapPin, Package, Shirt, Sparkles, Star, Watch } fro
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const USER_NAME_KEY = 'nomad_wardrobe_user_name'
+const USER_NAME_KEY = 'capsule_user_name'
 
 export function getUserName(): string | null {
     return localStorage.getItem(USER_NAME_KEY)
@@ -70,10 +70,10 @@ export default function Landing() {
                     {/* Logo */}
                     <div className="flex justify-center mb-8">
                         <div className="relative">
-                            <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-2xl shadow-amber-500/30">
-                                <Package className="h-12 w-12 text-black" />
+                            <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-violet-500/30">
+                                <Package className="h-12 w-12 text-white" />
                             </div>
-                            <div className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center animate-pulse">
+                            <div className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center animate-pulse">
                                 <Sparkles className="h-4 w-4 text-white" />
                             </div>
                         </div>
@@ -82,15 +82,13 @@ export default function Landing() {
                     {/* Title */}
                     <div className="space-y-4">
                         <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-                            <span className="bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 bg-clip-text text-transparent">
-                                Nomad
+                            <span className="bg-gradient-to-r from-violet-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                                Capsule
                             </span>
-                            <br />
-                            <span className="text-foreground">Wardrobe</span>
                         </h1>
                         <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-                            Your personal wardrobe manager for the nomadic lifestyle.
-                            Track, organize, and showcase everything you own.
+                            Manage everything you own, without the overwhelm.
+                            Track, organize, and curate your belongings.
                         </p>
                     </div>
 
@@ -123,23 +121,23 @@ export default function Landing() {
                         <Button
                             size="lg"
                             onClick={handleGetStarted}
-                            className="text-lg px-8 py-6 gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-semibold shadow-xl shadow-amber-500/25"
+                            className="text-lg px-8 py-6 gap-2 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold shadow-xl shadow-violet-500/25"
                         >
-                            Build Your Own Inventory
+                            Get Started
                             <ArrowRight className="h-5 w-5" />
                         </Button>
                     </div>
 
                     {/* Privacy note */}
                     <p className="text-sm text-muted-foreground">
-                        🔒 All your data stays locally in your browser. No account needed.
+                        🔒 100% private. All data stays in your browser.
                     </p>
                 </div>
             </div>
 
             {/* Footer */}
             <footer className="p-6 text-center text-sm text-muted-foreground border-t border-border/50">
-                <p>Built for nomads, by nomads. Your data, your control.</p>
+                <p>Your stuff, your way. No accounts, no cloud, no complexity.</p>
             </footer>
 
             {/* Onboarding Dialog */}
@@ -147,8 +145,8 @@ export default function Landing() {
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl">
-                            <Sparkles className="h-5 w-5 text-amber-400" />
-                            Welcome to Nomad Wardrobe!
+                            <Sparkles className="h-5 w-5 text-violet-400" />
+                            Welcome to Capsule!
                         </DialogTitle>
                         <DialogDescription>
                             Let's personalize your experience. What should we call you?
