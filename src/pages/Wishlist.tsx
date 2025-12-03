@@ -10,14 +10,19 @@ import { db, generateId, type WishlistItem } from '@/db'
 import { CATEGORIES, CURRENCIES, cn, formatCurrency } from '@/lib/utils'
 import { getDefaultCurrency } from '@/pages/Settings'
 import {
+  Briefcase,
   Check,
   ExternalLink,
+  Footprints,
+  Laptop,
   Link2,
   Package,
   Pencil,
   Plus,
+  Shirt,
   ShoppingBag,
   Trash2,
+  Watch,
   X
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -32,6 +37,22 @@ const priorityLabels = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
+}
+
+const categoryIcons: Record<string, typeof Package> = {
+  clothing: Shirt,
+  accessories: Watch,
+  gadgets: Laptop,
+  bags: Briefcase,
+  footwear: Footprints,
+}
+
+const categoryColors: Record<string, string> = {
+  clothing: 'from-blue-500 to-cyan-500',
+  accessories: 'from-purple-500 to-pink-500',
+  gadgets: 'from-emerald-500 to-green-500',
+  bags: 'from-amber-500 to-orange-500',
+  footwear: 'from-red-500 to-rose-500',
 }
 
 export default function Wishlist() {
@@ -221,72 +242,121 @@ export default function Wishlist() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {/* Unpurchased */}
+        <div className="space-y-6">
+          {/* Unpurchased Items - Card Grid */}
           {unpurchasedItems.length > 0 && (
-            <div className="space-y-2">
-              {unpurchasedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border bg-card hover:bg-secondary/50 transition-colors group"
-                >
-                  <button
-                    onClick={() => handleTogglePurchased(item)}
-                    className="h-5 w-5 md:h-6 md:w-6 rounded-full border-2 border-muted-foreground/50 hover:border-primary hover:bg-primary/10 transition-colors flex items-center justify-center shrink-0"
-                  >
-                    <Check className="h-3 w-3 text-transparent group-hover:text-primary/50" />
-                  </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {unpurchasedItems.map((item) => {
+                const Icon = categoryIcons[item.category || ''] || ShoppingBag
+                const colorClass = categoryColors[item.category || ''] || 'from-gray-500 to-slate-600'
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm md:text-base">{item.name}</span>
+                return (
+                  <Card key={item.id} className="group relative overflow-hidden hover:shadow-lg transition-all">
+                    {/* Priority indicator strip */}
+                    <div className={cn(
+                      "absolute top-0 left-0 right-0 h-1",
+                      item.priority === 'high' && 'bg-red-500',
+                      item.priority === 'medium' && 'bg-amber-500',
+                      item.priority === 'low' && 'bg-slate-500'
+                    )} />
+
+                    {/* Category visual */}
+                    <div className={cn(
+                      "h-24 flex items-center justify-center bg-gradient-to-br",
+                      colorClass
+                    )}>
+                      <Icon className="h-10 w-10 text-white/80" />
                       {item.quantity > 1 && (
-                        <Badge variant="secondary" className="text-xs">×{item.quantity}</Badge>
-                      )}
-                      <Badge variant="outline" className={cn('text-xs', priorityColors[item.priority])}>
-                        {priorityLabels[item.priority]}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground mt-0.5">
-                      {item.category && <span>{CATEGORIES.find(c => c.id === item.category)?.name || item.category}</span>}
-                      {item.estimatedCost && (
-                        <span>• {formatCurrency(item.estimatedCost * item.quantity, item.currency)}</span>
-                      )}
-                      {item.link && (
-                        <a
-                          href={item.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          <span className="hidden sm:inline">Link</span>
-                        </a>
+                        <Badge className="absolute top-3 right-2 bg-black/50 text-white border-0">
+                          ×{item.quantity}
+                        </Badge>
                       )}
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleEdit(item)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleDelete(item)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                    <CardContent className="p-4 space-y-3">
+                      {/* Name and priority */}
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-base leading-tight">{item.name}</h3>
+                        <Badge variant="outline" className={cn('text-xs shrink-0', priorityColors[item.priority])}>
+                          {priorityLabels[item.priority]}
+                        </Badge>
+                      </div>
+
+                      {/* Category and cost */}
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        {item.category && (
+                          <p>{CATEGORIES.find(c => c.id === item.category)?.name || item.category}</p>
+                        )}
+                        {item.estimatedCost && (
+                          <p className="font-medium text-foreground">
+                            {formatCurrency(item.estimatedCost * item.quantity, item.currency)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Notes preview */}
+                      {item.notes && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{item.notes}</p>
+                      )}
+
+                      {/* Actions row */}
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        {item.link ? (
+                          <>
+                            <a
+                              href={item.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button variant="default" size="sm" className="w-full gap-2">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Buy Now
+                              </Button>
+                            </a>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => handleTogglePurchased(item)}
+                              title="Mark as Purchased"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-2"
+                            onClick={() => handleTogglePurchased(item)}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Mark Done
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => handleEdit(item)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-destructive"
+                          onClick={() => handleDelete(item)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
 

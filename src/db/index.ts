@@ -241,3 +241,184 @@ export async function getStorageStats() {
     };
 }
 
+// Export data with images as separate files
+export async function exportWithImages(folderHandle: FileSystemDirectoryHandle) {
+    const items = await db.items.toArray();
+    const trips = await db.trips.toArray();
+    const tripItems = await db.tripItems.toArray();
+    const outfits = await db.outfits.toArray();
+    const wishlist = await db.wishlist.toArray();
+
+    // Create images subfolder
+    const imagesFolder = await folderHandle.getDirectoryHandle('images', { create: true });
+
+    // Track image mappings
+    const imageMap: Record<string, string> = {};
+    let imageCount = 0;
+
+    // Export items with image references instead of base64
+    const itemsForExport = await Promise.all(items.map(async (item) => {
+        if (item.imageData) {
+            const ext = item.imageData.startsWith('data:image/png') ? 'png' : 'jpg';
+            const fileName = `${item.id}.${ext}`;
+
+            try {
+                // Convert base64 to blob and save
+                const base64Data = item.imageData.split(',')[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: `image/${ext}` });
+
+                // Write image file
+                const fileHandle = await imagesFolder.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+
+                imageMap[item.id] = fileName;
+                imageCount++;
+
+                // Return item with image reference instead of base64
+                return { ...item, imageData: undefined, imageFile: fileName };
+            } catch (e) {
+                console.warn('Failed to export image for item:', item.id);
+                return item;
+            }
+        }
+        return item;
+    }));
+
+    // Create export data
+    const exportData = {
+        version: '3.0',
+        exportedAt: new Date().toISOString(),
+        hasImages: imageCount > 0,
+        imageCount,
+        data: {
+            items: itemsForExport,
+            trips,
+            tripItems,
+            outfits,
+            wishlist
+        },
+    };
+
+    // Write JSON file
+    const jsonFileName = `capsule-backup-${new Date().toISOString().split('T')[0]}.json`;
+    const jsonHandle = await folderHandle.getFileHandle(jsonFileName, { create: true });
+    const jsonWritable = await jsonHandle.createWritable();
+    await jsonWritable.write(JSON.stringify(exportData, null, 2));
+    await jsonWritable.close();
+
+    return { jsonFileName, imageCount };
+}
+
+// Import data with images from folder
+export async function importWithImages(folderHandle: FileSystemDirectoryHandle) {
+    const results = { items: 0, trips: 0, tripItems: 0, outfits: 0, wishlist: 0, images: 0 };
+
+    // Find the JSON file
+    let jsonData = null;
+    // @ts-ignore - File System Access API iteration
+    for await (const [name, entry] of folderHandle.entries()) {
+        if (entry.kind === 'file' && name.endsWith('.json')) {
+            const file = await (entry as FileSystemFileHandle).getFile();
+            const text = await file.text();
+            jsonData = JSON.parse(text);
+            break;
+        }
+    }
+
+    if (!jsonData) {
+        throw new Error('No JSON backup file found in folder');
+    }
+
+    // Check for images folder
+    let imagesFolder: FileSystemDirectoryHandle | null = null;
+    try {
+        imagesFolder = await folderHandle.getDirectoryHandle('images');
+    } catch {
+        // No images folder
+    }
+
+    // Import items with images
+    if (jsonData.data.items) {
+        for (const item of jsonData.data.items) {
+            try {
+                // Try to load image if referenced
+                if (item.imageFile && imagesFolder) {
+                    try {
+                        const imageHandle = await imagesFolder.getFileHandle(item.imageFile);
+                        const imageFile = await imageHandle.getFile();
+                        const buffer = await imageFile.arrayBuffer();
+                        const base64 = btoa(
+                            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                        );
+                        const mimeType = item.imageFile.endsWith('.png') ? 'image/png' : 'image/jpeg';
+                        item.imageData = `data:${mimeType};base64,${base64}`;
+                        results.images++;
+                    } catch {
+                        console.warn('Could not load image:', item.imageFile);
+                    }
+                }
+                delete item.imageFile;
+                await db.items.put(item);
+                results.items++;
+            } catch (e) {
+                console.warn('Skipping item:', item.id);
+            }
+        }
+    }
+
+    // Import other data
+    if (jsonData.data.trips) {
+        for (const trip of jsonData.data.trips) {
+            try {
+                await db.trips.put(trip);
+                results.trips++;
+            } catch (e) {
+                console.warn('Skipping trip:', trip.id);
+            }
+        }
+    }
+
+    if (jsonData.data.tripItems) {
+        for (const tripItem of jsonData.data.tripItems) {
+            try {
+                await db.tripItems.put(tripItem);
+                results.tripItems++;
+            } catch (e) {
+                console.warn('Skipping tripItem:', tripItem.id);
+            }
+        }
+    }
+
+    if (jsonData.data.outfits) {
+        for (const outfit of jsonData.data.outfits) {
+            try {
+                await db.outfits.put(outfit);
+                results.outfits++;
+            } catch (e) {
+                console.warn('Skipping outfit:', outfit.id);
+            }
+        }
+    }
+
+    if (jsonData.data.wishlist) {
+        for (const wishlistItem of jsonData.data.wishlist) {
+            try {
+                await db.wishlist.put(wishlistItem);
+                results.wishlist++;
+            } catch (e) {
+                console.warn('Skipping wishlist item:', wishlistItem.id);
+            }
+        }
+    }
+
+    return results;
+}
+

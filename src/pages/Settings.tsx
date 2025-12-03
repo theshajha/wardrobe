@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { exportAllData, getStorageStats, importAllData } from '@/db'
+import { exportAllData, exportWithImages, getStorageStats, importAllData, importWithImages } from '@/db'
 import { formatBytes } from '@/lib/utils'
 import {
   AlertTriangle,
@@ -13,6 +13,7 @@ import {
   Database,
   DollarSign,
   Download,
+  FolderOpen,
   FolderSync,
   HardDrive,
   ImageIcon,
@@ -317,6 +318,59 @@ export default function Settings() {
     setDefaultCurrency(currency)
   }
 
+  const handleExportWithImages = async () => {
+    try {
+      // @ts-ignore - File System Access API
+      const handle = await window.showDirectoryPicker({
+        mode: 'readwrite',
+      })
+
+      setExporting(true)
+      setExportResult(null)
+
+      const result = await exportWithImages(handle)
+
+      setExportResult({
+        success: true,
+        message: `Exported ${result.jsonFileName} with ${result.imageCount} images to ${handle.name}/`
+      })
+      saveExportSettings({ lastExportDate: new Date().toISOString() })
+      loadStorageStats()
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        setExportResult({ success: false, message: 'Export failed: ' + (e as Error).message })
+      }
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportFromFolder = async () => {
+    try {
+      // @ts-ignore - File System Access API
+      const handle = await window.showDirectoryPicker({
+        mode: 'read',
+      })
+
+      setImporting(true)
+      setImportResult(null)
+
+      const results = await importWithImages(handle)
+
+      setImportResult({
+        success: true,
+        message: `Imported: ${results.items} items, ${results.trips} trips, ${results.outfits} outfits, ${results.images} images`
+      })
+      loadStorageStats()
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        setImportResult({ success: false, message: 'Import failed: ' + (e as Error).message })
+      }
+    } finally {
+      setImporting(false)
+    }
+  }
+
   // Estimate capacity (conservative: 500MB usable for this app)
   const estimatedCapacity = 500 * 1024 * 1024 // 500 MB
   const usagePercentage = storageStats ? (storageStats.totalEstimatedSize / estimatedCapacity) * 100 : 0
@@ -393,7 +447,71 @@ export default function Settings() {
 
         {/* Backup Tab */}
         <TabsContent value="backup" className="space-y-4 mt-4">
-          {/* Quick Export */}
+          {/* Main Backup Card */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" />
+                Backup & Restore
+              </CardTitle>
+              <CardDescription>
+                Export your data with images for complete backup
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 rounded-lg bg-secondary/50 text-sm space-y-1">
+                <p className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Items with images:</span>
+                  <strong>{storageStats?.itemsWithImages || 0}</strong>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Creates JSON backup + images folder for complete data portability
+                </p>
+              </div>
+
+              {folderSupported ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <Button onClick={handleExportWithImages} disabled={exporting} className="gap-2">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    Export
+                  </Button>
+                  <Button onClick={handleImportFromFolder} disabled={importing} variant="outline" className="gap-2">
+                    {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+                    Import
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Button onClick={handleExport} disabled={exporting} variant="outline">
+                    {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Export JSON
+                  </Button>
+                  <Button onClick={handleImportClick} disabled={importing} variant="outline">
+                    {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                    Import JSON
+                  </Button>
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+
+              {(exportResult || importResult) && (
+                <div className={`p-2 rounded text-xs flex items-center gap-2 ${(exportResult?.success || importResult?.success) ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
+                  {(exportResult?.success || importResult?.success) ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  {exportResult?.message || importResult?.message}
+                </div>
+              )}
+
+              {exportSettings.lastExportDate && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  Last export: {new Date(exportSettings.lastExportDate).toLocaleString()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Auto Backup */}
           {folderSupported && (
             <Card>
               <CardHeader className="pb-4">
@@ -401,7 +519,7 @@ export default function Settings() {
                   <FolderSync className="h-4 w-4" />
                   Auto Backup
                 </CardTitle>
-                <CardDescription>Set up automatic backups to a folder</CardDescription>
+                <CardDescription>Schedule automatic backups to a folder</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -456,46 +574,9 @@ export default function Settings() {
                     </Button>
                   </>
                 )}
-
-                {exportSettings.lastExportDate && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    Last: {new Date(exportSettings.lastExportDate).toLocaleString()}
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
-
-          {/* Manual Export/Import */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Manual Backup
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <Button onClick={handleExport} disabled={exporting} variant="outline">
-                  {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                  Download
-                </Button>
-                <Button onClick={handleImportClick} disabled={importing} variant="outline">
-                  {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Import
-                </Button>
-              </div>
-              <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
-
-              {(exportResult || importResult) && (
-                <div className={`p-2 rounded text-xs flex items-center gap-2 ${(exportResult?.success || importResult?.success) ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
-                  {(exportResult?.success || importResult?.success) ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                  {exportResult?.message || importResult?.message}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Backup Warning */}
           <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 flex items-start gap-3">

@@ -40,17 +40,92 @@ const categoryColors: Record<string, string> = {
     footwear: 'from-red-500 to-rose-500',
 }
 
-// Compress data for URL sharing
-function compressForUrl(data: object): string {
+// Generate a short hash from data
+function generateShortCode(data: object): string {
     const json = JSON.stringify(data)
-    // Use base64 encoding (in production you might want to use a compression library)
-    return btoa(encodeURIComponent(json))
+    // Simple hash function
+    let hash = 0
+    for (let i = 0; i < json.length; i++) {
+        const char = json.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash // Convert to 32-bit integer
+    }
+    // Convert to base36 and take first 6 chars
+    const code = Math.abs(hash).toString(36).toUpperCase().padStart(6, '0').slice(0, 6)
+    return code
 }
 
-// Decompress data from URL
-function decompressFromUrl(encoded: string): object | null {
+// Store share data in localStorage with short code
+const SHARE_STORAGE_KEY = 'capsule-shared-showcases'
+
+function storeShareData(code: string, data: object): void {
     try {
-        const json = decodeURIComponent(atob(encoded))
+        const stored = localStorage.getItem(SHARE_STORAGE_KEY)
+        const shares = stored ? JSON.parse(stored) : {}
+        shares[code] = {
+            data,
+            createdAt: new Date().toISOString(),
+        }
+        // Keep only last 50 shares
+        const keys = Object.keys(shares)
+        if (keys.length > 50) {
+            delete shares[keys[0]]
+        }
+        localStorage.setItem(SHARE_STORAGE_KEY, JSON.stringify(shares))
+    } catch (e) {
+        console.error('Failed to store share data:', e)
+    }
+}
+
+function getShareData(code: string): object | null {
+    try {
+        const stored = localStorage.getItem(SHARE_STORAGE_KEY)
+        if (stored) {
+            const shares = JSON.parse(stored)
+            return shares[code]?.data || null
+        }
+    } catch (e) {
+        console.error('Failed to get share data:', e)
+    }
+    return null
+}
+
+// Compact data encoding for URL (compressed but still works cross-device)
+function encodeCompact(data: object): string {
+    const json = JSON.stringify(data)
+    // Use a more compact encoding: first compress common patterns
+    const compressed = json
+        .replace(/"name":/g, '"n":')
+        .replace(/"category":/g, '"c":')
+        .replace(/"subcategory":/g, '"s":')
+        .replace(/"brand":/g, '"b":')
+        .replace(/"color":/g, '"o":')
+        .replace(/"title":/g, '"t":')
+        .replace(/"description":/g, '"d":')
+        .replace(/"items":/g, '"i":')
+
+    return btoa(encodeURIComponent(compressed))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '')
+}
+
+function decodeCompact(encoded: string): object | null {
+    try {
+        // Restore base64 chars
+        let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
+        while (b64.length % 4) b64 += '='
+
+        const json = decodeURIComponent(atob(b64))
+            .replace(/"n":/g, '"name":')
+            .replace(/"c":/g, '"category":')
+            .replace(/"s":/g, '"subcategory":')
+            .replace(/"b":/g, '"brand":')
+            .replace(/"o":/g, '"color":')
+            .replace(/"t":/g, '"title":')
+            .replace(/"d":/g, '"description":')
+            .replace(/"i":/g, '"items":')
+
         return JSON.parse(json)
     } catch {
         return null
@@ -307,12 +382,22 @@ export default function Showcase() {
                 subcategory: item.subcategory,
                 brand: item.brand,
                 color: item.color,
-                size: item.size,
             }))
         }
 
-        const encoded = compressForUrl(shareData)
-        const url = `${window.location.origin}/showcase?share=${encoded}`
+        // Generate short code and store data
+        const code = generateShortCode(shareData)
+        storeShareData(code, shareData)
+
+        // Create compact encoded version for cross-device sharing
+        const encoded = encodeCompact(shareData)
+
+        // Use short code if URL would be too long
+        const fullUrl = `${window.location.origin}/showcase?s=${encoded}`
+        const shortUrl = `${window.location.origin}/showcase?c=${code}`
+
+        // If encoded URL is longer than 200 chars, use the code version
+        const url = fullUrl.length > 200 ? shortUrl : fullUrl
         setShareUrl(url)
         setShowShareDialog(true)
     }
@@ -326,13 +411,27 @@ export default function Showcase() {
     // Check for shared showcase in URL
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
-        const shareParam = params.get('share')
-        if (shareParam) {
-            const data = decompressFromUrl(shareParam) as { title: string; description: string; items: Partial<Item>[] } | null
+
+        // Check for compact encoded data
+        const compactParam = params.get('s')
+        if (compactParam) {
+            const data = decodeCompact(compactParam) as { title: string; description: string; items: Partial<Item>[] } | null
             if (data) {
-                // Display shared showcase (read-only mode)
-                console.log('Shared showcase data:', data)
-                // You could set a "viewing shared" state here
+                console.log('Shared showcase data (compact):', data)
+                setExportTitle(data.title || 'Shared Showcase')
+                setExportDescription(data.description || '')
+            }
+            return
+        }
+
+        // Check for short code
+        const codeParam = params.get('c')
+        if (codeParam) {
+            const data = getShareData(codeParam) as { title: string; description: string; items: Partial<Item>[] } | null
+            if (data) {
+                console.log('Shared showcase data (code):', data)
+                setExportTitle(data.title || 'Shared Showcase')
+                setExportDescription(data.description || '')
             }
         }
     }, [])
