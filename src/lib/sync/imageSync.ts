@@ -3,13 +3,13 @@
  * Handles uploading/downloading images to/from Cloudflare R2
  */
 
-import { 
-    db, 
-    computeImageHash, 
-    updateImageSyncStatus, 
+import {
+    computeImageHash,
+    db,
     getItemsNeedingImageSync,
-    type Item,
-    type ImageSyncStatus 
+    updateImageSyncStatus,
+    type ImageSyncStatus,
+    type Item
 } from '@/db';
 import { getAuthHeaders } from './auth';
 import type { PresignedUrlResponse } from './types';
@@ -24,11 +24,11 @@ function base64ToBlob(base64: string): Blob {
     const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const binaryString = atob(parts[1]);
     const bytes = new Uint8Array(binaryString.length);
-    
+
     for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
     }
-    
+
     return new Blob([bytes], { type: mime });
 }
 
@@ -48,8 +48,8 @@ async function blobToBase64(blob: Blob): Promise<string> {
  * Get presigned URL for image upload
  */
 async function getPresignedUploadUrl(
-    hash: string, 
-    contentType: string, 
+    hash: string,
+    contentType: string,
     size: number
 ): Promise<PresignedUrlResponse> {
     const apiUrl = SYNC_API_URL;
@@ -68,7 +68,7 @@ async function getPresignedUploadUrl(
         });
 
         const data = await response.json();
-        
+
         if (!response.ok) {
             return { success: false, error: data.error || 'Failed to get upload URL' };
         }
@@ -104,7 +104,7 @@ export async function uploadImage(item: Item): Promise<{
 
         // Get presigned URL
         const presignResult = await getPresignedUploadUrl(hash, contentType, size);
-        
+
         if (!presignResult.success) {
             await updateImageSyncStatus(item.id, 'error');
             return { success: false, error: presignResult.error };
@@ -116,17 +116,24 @@ export async function uploadImage(item: Item): Promise<{
             return { success: true, imageRef: presignResult.imageRef };
         }
 
-        // Upload to R2 using presigned URL
+        // Upload to R2 through worker endpoint
         if (!presignResult.uploadUrl) {
             await updateImageSyncStatus(item.id, 'error');
             return { success: false, error: 'No upload URL received' };
         }
 
-        const uploadResponse = await fetch(presignResult.uploadUrl, {
+        // The uploadUrl is relative, make it absolute and add auth
+        const apiUrl = SYNC_API_URL;
+        const fullUploadUrl = presignResult.uploadUrl.startsWith('http')
+            ? presignResult.uploadUrl
+            : `${apiUrl}${presignResult.uploadUrl}`;
+
+        const uploadResponse = await fetch(fullUploadUrl, {
             method: 'PUT',
             body: blob,
             headers: {
                 'Content-Type': contentType,
+                ...(await getAuthHeaders()),
             },
         });
 
@@ -137,7 +144,7 @@ export async function uploadImage(item: Item): Promise<{
 
         // Update item with cloud reference
         await updateImageSyncStatus(item.id, 'synced', presignResult.imageRef, hash);
-        
+
         return { success: true, imageRef: presignResult.imageRef };
     } catch (error) {
         console.error('[ImageSync] Upload failed for item:', item.id, error);
@@ -171,7 +178,7 @@ export async function downloadImage(imageRef: string): Promise<{
 
         const blob = await response.blob();
         const base64 = await blobToBase64(blob);
-        
+
         return { success: true, data: base64 };
     } catch (error) {
         console.error('[ImageSync] Download failed for:', imageRef, error);
@@ -236,9 +243,9 @@ export async function downloadMissingImages(
 }> {
     // Find items with cloud refs but no local image data
     const items = await db.items
-        .filter(item => 
-            !!item.imageRef && 
-            !item.imageData && 
+        .filter(item =>
+            !!item.imageRef &&
+            !item.imageData &&
             item.imageSyncStatus !== 'error'
         )
         .toArray();
@@ -306,7 +313,7 @@ export async function getImageSyncStats(): Promise<{
     localOnly: number;
 }> {
     const items = await db.items.toArray();
-    
+
     const stats = {
         total: 0,
         synced: 0,
@@ -318,9 +325,9 @@ export async function getImageSyncStats(): Promise<{
 
     for (const item of items) {
         if (!item.imageData && !item.imageRef) continue;
-        
+
         stats.total++;
-        
+
         switch (item.imageSyncStatus) {
             case 'synced':
                 stats.synced++;
