@@ -1,14 +1,15 @@
 /**
  * Image Routes for Fitso.me Sync API
- * Handles image upload/download with R2 storage and deduplication
+ * Handles image upload/download with R2 storage
+ * Images are stored per-user: users/{userId}/images/{hash}
  */
 
 import { Hono } from 'hono';
-import type { Env, Session, ImageMetadata } from '../types';
+import type { Env, ImageMetadata, Session } from '../types';
 
-export const imagesRouter = new Hono<{ 
-  Bindings: Env; 
-  Variables: { session: Session } 
+export const imagesRouter = new Hono<{
+  Bindings: Env;
+  Variables: { session: Session }
 }>();
 
 // Maximum image size (10MB)
@@ -22,6 +23,13 @@ const ALLOWED_CONTENT_TYPES = [
   'image/webp',
   'image/gif',
 ];
+
+/**
+ * Build user-scoped image key
+ */
+function buildImageKey(userId: string, hash: string): string {
+  return `users/${userId}/images/${hash}`;
+}
 
 /**
  * POST /images/presign-upload
@@ -51,10 +59,10 @@ imagesRouter.post('/presign-upload', async (c) => {
       return c.json({ success: false, error: 'Image too large (max 10MB)' }, 400);
     }
 
-    // Image key uses hash for deduplication (shared across users)
-    const imageKey = `images/${hash}`;
+    // Image key is user-scoped for isolation
+    const imageKey = buildImageKey(session.userId, hash);
 
-    // Check if image already exists (deduplication)
+    // Check if image already exists for this user (per-user deduplication)
     const existing = await c.env.R2_IMAGES.head(imageKey);
     if (existing) {
       return c.json({
@@ -100,7 +108,7 @@ imagesRouter.put('/upload/:hash', async (c) => {
     }
 
     const body = await c.req.arrayBuffer();
-    
+
     if (body.byteLength > MAX_IMAGE_SIZE) {
       return c.json({ success: false, error: 'Image too large' }, 400);
     }
@@ -111,9 +119,10 @@ imagesRouter.put('/upload/:hash', async (c) => {
       return c.json({ success: false, error: 'Hash mismatch' }, 400);
     }
 
-    const imageKey = `images/${hash}`;
+    // User-scoped image key
+    const imageKey = buildImageKey(session.userId, hash);
 
-    // Check if already exists
+    // Check if already exists for this user
     const existing = await c.env.R2_IMAGES.head(imageKey);
     if (existing) {
       return c.json({
@@ -152,17 +161,19 @@ imagesRouter.put('/upload/:hash', async (c) => {
 
 /**
  * GET /images/check/:hash
- * Check if an image exists
+ * Check if an image exists for the current user
  */
 imagesRouter.get('/check/:hash', async (c) => {
   try {
+    const session = c.get('session');
     const hash = c.req.param('hash');
 
     if (!hash || hash.length !== 64) {
       return c.json({ exists: false });
     }
 
-    const imageKey = `images/${hash}`;
+    // Check in user's image folder
+    const imageKey = buildImageKey(session.userId, hash);
     const existing = await c.env.R2_IMAGES.head(imageKey);
 
     return c.json({ exists: !!existing });
@@ -174,18 +185,32 @@ imagesRouter.get('/check/:hash', async (c) => {
 
 /**
  * GET /images/:path
- * Download an image
+ * Download an image (must belong to current user)
  */
 imagesRouter.get('/:path{.+}', async (c) => {
   try {
+    const session = c.get('session');
     const path = c.req.param('path');
 
     if (!path) {
       return c.json({ error: 'Path required' }, 400);
     }
 
-    // Ensure path is within images directory
-    const imageKey = path.startsWith('images/') ? path : `images/${path}`;
+    // The path should be the full imageRef (users/{userId}/images/{hash})
+    // or just the hash for backward compatibility
+    let imageKey: string;
+
+    if (path.startsWith('users/')) {
+      // Full path provided - verify it belongs to this user
+      if (!path.startsWith(`users/${session.userId}/`)) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      imageKey = path;
+    } else {
+      // Just hash provided - build user-scoped key
+      const hash = path.replace('images/', '');
+      imageKey = buildImageKey(session.userId, hash);
+    }
 
     const object = await c.env.R2_IMAGES.get(imageKey);
 
@@ -213,7 +238,7 @@ imagesRouter.get('/:path{.+}', async (c) => {
 
 /**
  * DELETE /images/:hash
- * Delete an image (admin only or ownership check)
+ * Delete an image (user can only delete their own images)
  */
 imagesRouter.delete('/:hash', async (c) => {
   try {
@@ -224,20 +249,13 @@ imagesRouter.delete('/:hash', async (c) => {
       return c.json({ success: false, error: 'Invalid hash' }, 400);
     }
 
-    const imageKey = `images/${hash}`;
+    // User-scoped image key - users can only delete their own images
+    const imageKey = buildImageKey(session.userId, hash);
 
-    // Get image metadata to check ownership
+    // Check if image exists
     const object = await c.env.R2_IMAGES.head(imageKey);
     if (!object) {
       return c.json({ success: true, message: 'Image already deleted' });
-    }
-
-    // Check if user uploaded this image
-    const uploadedBy = object.customMetadata?.uploadedBy;
-    if (uploadedBy && uploadedBy !== session.userId) {
-      // For shared images, we don't delete - just acknowledge
-      // In a production system, you might implement reference counting
-      return c.json({ success: true, message: 'Image is shared' });
     }
 
     await c.env.R2_IMAGES.delete(imageKey);
