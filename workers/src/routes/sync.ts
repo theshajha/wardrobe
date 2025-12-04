@@ -35,33 +35,14 @@ syncRouter.get('/', async (c) => {
     const session = c.get('session');
     const sinceVersion = parseInt(c.req.query('since') || '0', 10);
 
-    // Get user data from R2 - stored at {username}/data.json
-    const userDataKey = `${session.username}/data.json`;
-    const dataObject = await c.env.R2_BUCKET.get(userDataKey);
-
-    if (!dataObject) {
-      // No data yet, return empty
-      const response: SyncPullResponse = {
-        success: true,
-        version: 0,
-        changes: {
-          items: { upserts: [], deletes: [] },
-          trips: { upserts: [], deletes: [] },
-          tripItems: { upserts: [], deletes: [] },
-          outfits: { upserts: [], deletes: [] },
-          wishlist: { upserts: [], deletes: [] },
-        },
-      };
-      return c.json(response);
-    }
-
-    const userData = await dataObject.json<UserData>();
+    // Load metadata
+    const metadata = await loadMetadata(c.env.R2_BUCKET, session.username);
 
     // If client is at current version, no changes needed
-    if (sinceVersion >= userData.version) {
+    if (sinceVersion >= metadata.version) {
       const response: SyncPullResponse = {
         success: true,
-        version: userData.version,
+        version: metadata.version,
         changes: {
           items: { upserts: [], deletes: [] },
           trips: { upserts: [], deletes: [] },
@@ -72,32 +53,41 @@ syncRouter.get('/', async (c) => {
       };
       return c.json(response);
     }
+
+    // Load all table data from separate files
+    const [items, trips, tripItems, outfits, wishlist] = await Promise.all([
+      loadTableData<SyncItem>(c.env.R2_BUCKET, session.username, 'items'),
+      loadTableData<SyncTrip>(c.env.R2_BUCKET, session.username, 'trips'),
+      loadTableData<SyncTripItem>(c.env.R2_BUCKET, session.username, 'tripItems'),
+      loadTableData<SyncOutfit>(c.env.R2_BUCKET, session.username, 'outfits'),
+      loadTableData<SyncWishlistItem>(c.env.R2_BUCKET, session.username, 'wishlist'),
+    ]);
 
     // Return all current data (client will merge using timestamps)
     // Separate active records from deleted ones
     const response: SyncPullResponse = {
       success: true,
-      version: userData.version,
+      version: metadata.version,
       changes: {
         items: {
-          upserts: userData.items.filter(i => !i._deleted),
-          deletes: userData.items.filter(i => i._deleted).map(i => i.id),
+          upserts: items.filter(i => !i._deleted),
+          deletes: items.filter(i => i._deleted).map(i => i.id),
         },
         trips: {
-          upserts: userData.trips.filter(t => !t._deleted),
-          deletes: userData.trips.filter(t => t._deleted).map(t => t.id),
+          upserts: trips.filter(t => !t._deleted),
+          deletes: trips.filter(t => t._deleted).map(t => t.id),
         },
         tripItems: {
-          upserts: userData.tripItems.filter(ti => !ti._deleted),
-          deletes: userData.tripItems.filter(ti => ti._deleted).map(ti => ti.id),
+          upserts: tripItems.filter(ti => !ti._deleted),
+          deletes: tripItems.filter(ti => ti._deleted).map(ti => ti.id),
         },
         outfits: {
-          upserts: userData.outfits.filter(o => !o._deleted),
-          deletes: userData.outfits.filter(o => o._deleted).map(o => o.id),
+          upserts: outfits.filter(o => !o._deleted),
+          deletes: outfits.filter(o => o._deleted).map(o => o.id),
         },
         wishlist: {
-          upserts: userData.wishlist.filter(w => !w._deleted),
-          deletes: userData.wishlist.filter(w => w._deleted).map(w => w.id),
+          upserts: wishlist.filter(w => !w._deleted),
+          deletes: wishlist.filter(w => w._deleted).map(w => w.id),
         },
       },
     };
@@ -123,60 +113,51 @@ syncRouter.post('/', async (c) => {
       return c.json({ success: false, error: 'Invalid changes format' } as SyncPushResponse, 400);
     }
 
-    // Get current user data from R2 - stored at {username}/data.json
-    const userDataKey = `${session.username}/data.json`;
-    const dataObject = await c.env.R2_BUCKET.get(userDataKey);
-
-    let userData: UserData;
-    if (dataObject) {
-      userData = await dataObject.json<UserData>();
-    } else {
-      // Initialize empty user data
-      userData = {
-        version: 0,
-        updatedAt: new Date().toISOString(),
-        items: [],
-        trips: [],
-        tripItems: [],
-        outfits: [],
-        wishlist: [],
-      };
-    }
+    // Load current metadata
+    const metadata = await loadMetadata(c.env.R2_BUCKET, session.username);
 
     // Check for version conflict (optimistic locking)
     const conflictIds: string[] = [];
 
-    if (lastSyncVersion !== userData.version) {
+    if (lastSyncVersion !== metadata.version) {
       // There are server changes the client doesn't have
       // We'll still apply changes using LWW, but flag conflicts
-      console.log(`Version mismatch: client=${lastSyncVersion}, server=${userData.version}`);
+      console.log(`Version mismatch: client=${lastSyncVersion}, server=${metadata.version}`);
     }
 
-    // Apply changes using Last-Write-Wins
+    // Group changes by table for efficient processing
+    const changesByTable = new Map<string, LocalChange[]>();
     for (const change of changes) {
-      const result = applyChange(userData, change);
-      if (result.conflict) {
-        conflictIds.push(change.recordId);
+      const tableChanges = changesByTable.get(change.table) || [];
+      tableChanges.push(change);
+      changesByTable.set(change.table, tableChanges);
+    }
+
+    // Process each table's changes
+    for (const [tableName, tableChanges] of changesByTable) {
+      // Load current table data
+      const tableData = await loadTableData<SyncableRecord>(c.env.R2_BUCKET, session.username, tableName);
+
+      // Apply changes using Last-Write-Wins
+      for (const change of tableChanges) {
+        const result = applyChangeToArray(tableData, change);
+        if (result.conflict) {
+          conflictIds.push(change.recordId);
+        }
       }
+
+      // Save updated table data
+      await saveTableData(c.env.R2_BUCKET, session.username, tableName, tableData);
     }
 
     // Increment version and update timestamp
-    userData.version += 1;
-    userData.updatedAt = new Date().toISOString();
-
-    // Save updated data to R2
-    await c.env.R2_BUCKET.put(userDataKey, JSON.stringify(userData), {
-      customMetadata: {
-        userId: session.userId,
-        username: session.username,
-        version: String(userData.version),
-        updatedAt: userData.updatedAt,
-      },
-    });
+    metadata.version += 1;
+    metadata.updatedAt = new Date().toISOString();
+    await saveMetadata(c.env.R2_BUCKET, session.username, metadata, session);
 
     const response: SyncPushResponse = {
       success: true,
-      version: userData.version,
+      version: metadata.version,
       conflictIds: conflictIds.length > 0 ? conflictIds : undefined,
     };
 
@@ -188,19 +169,82 @@ syncRouter.post('/', async (c) => {
 });
 
 /**
- * Apply a single change to user data using Last-Write-Wins
+ * Load metadata from R2
  */
-function applyChange(
-  userData: UserData,
+async function loadMetadata(bucket: R2Bucket, username: string): Promise<{ version: number; updatedAt: string }> {
+  const metadataKey = `${username}/metadata.json`;
+  const metadataObject = await bucket.get(metadataKey);
+
+  if (!metadataObject) {
+    // Initialize with default metadata
+    return {
+      version: 0,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  return await metadataObject.json<{ version: number; updatedAt: string }>();
+}
+
+/**
+ * Save metadata to R2
+ */
+async function saveMetadata(
+  bucket: R2Bucket,
+  username: string,
+  metadata: { version: number; updatedAt: string },
+  session: Session
+): Promise<void> {
+  const metadataKey = `${username}/metadata.json`;
+  await bucket.put(metadataKey, JSON.stringify(metadata), {
+    customMetadata: {
+      userId: session.userId,
+      username: session.username,
+      version: String(metadata.version),
+      updatedAt: metadata.updatedAt,
+    },
+  });
+}
+
+/**
+ * Load table data from R2
+ */
+async function loadTableData<T extends SyncableRecord>(
+  bucket: R2Bucket,
+  username: string,
+  tableName: string
+): Promise<T[]> {
+  const tableKey = `${username}/${tableName}.json`;
+  const tableObject = await bucket.get(tableKey);
+
+  if (!tableObject) {
+    return [];
+  }
+
+  return await tableObject.json<T[]>();
+}
+
+/**
+ * Save table data to R2
+ */
+async function saveTableData<T extends SyncableRecord>(
+  bucket: R2Bucket,
+  username: string,
+  tableName: string,
+  data: T[]
+): Promise<void> {
+  const tableKey = `${username}/${tableName}.json`;
+  await bucket.put(tableKey, JSON.stringify(data));
+}
+
+/**
+ * Apply a single change to an array using Last-Write-Wins
+ */
+function applyChangeToArray(
+  dataArray: SyncableRecord[],
   change: LocalChange
 ): { applied: boolean; conflict: boolean } {
-  const { table, recordId, operation, payload, timestamp } = change;
-
-  // Get the appropriate array from userData
-  const dataArray = getDataArray(userData, table);
-  if (!dataArray) {
-    return { applied: false, conflict: false };
-  }
+  const { recordId, operation, payload, timestamp } = change;
 
   const existingIndex = dataArray.findIndex((r: SyncableRecord) => r.id === recordId);
   const existingRecord = existingIndex >= 0 ? dataArray[existingIndex] : null;
@@ -240,20 +284,6 @@ function applyChange(
   }
 
   return { applied: false, conflict: false };
-}
-
-/**
- * Get the data array for a table name
- */
-function getDataArray(userData: UserData, table: string): SyncableRecord[] | null {
-  switch (table) {
-    case 'items': return userData.items;
-    case 'trips': return userData.trips;
-    case 'tripItems': return userData.tripItems;
-    case 'outfits': return userData.outfits;
-    case 'wishlist': return userData.wishlist;
-    default: return null;
-  }
 }
 
 /**

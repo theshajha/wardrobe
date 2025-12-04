@@ -557,6 +557,14 @@ export async function logChange(
     // Update pending count
     const pendingCount = await getPendingChangesCount();
     await updateSyncMeta({ pendingChanges: pendingCount });
+
+    // Trigger debounced sync if change tracking is enabled
+    // Use dynamic import to avoid circular dependency
+    import('@/lib/sync').then(({ syncEngine }) => {
+        syncEngine.triggerDebouncedSync();
+    }).catch(err => {
+        console.warn('[logChange] Failed to trigger sync:', err);
+    });
 }
 
 // Get unsynced changes
