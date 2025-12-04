@@ -442,14 +442,27 @@ class SyncEngine {
 
     /**
      * Upsert a record in local database
+     * Preserves local imageData for items when syncing from server
      */
     private async upsertRecord(table: SyncTable, record: SyncableRecord): Promise<void> {
-        switch (table) {
-            case 'items': await db.items.put(record as Item); break;
-            case 'trips': await db.trips.put(record as Trip); break;
-            case 'tripItems': await db.tripItems.put(record as TripItem); break;
-            case 'outfits': await db.outfits.put(record as Outfit); break;
-            case 'wishlist': await db.wishlist.put(record as WishlistItem); break;
+        // For items table, preserve local imageData if it exists
+        if (table === 'items') {
+            const itemRecord = record as Item;
+            const localItem = await db.items.get(itemRecord.id);
+
+            // If local item has imageData and server record has matching imageRef, preserve the local imageData
+            if (localItem?.imageData && itemRecord.imageRef === localItem.imageRef) {
+                itemRecord.imageData = localItem.imageData;
+            }
+
+            await db.items.put(itemRecord);
+        } else {
+            switch (table) {
+                case 'trips': await db.trips.put(record as Trip); break;
+                case 'tripItems': await db.tripItems.put(record as TripItem); break;
+                case 'outfits': await db.outfits.put(record as Outfit); break;
+                case 'wishlist': await db.wishlist.put(record as WishlistItem); break;
+            }
         }
     }
 
