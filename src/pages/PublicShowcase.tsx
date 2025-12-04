@@ -5,10 +5,11 @@
  */
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SYNC_API_URL } from '@/lib/sync/types';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, ArrowLeft, Package, Shirt } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Package, Shirt, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
@@ -185,6 +186,31 @@ export default function PublicShowcase() {
           </p>
         </div>
 
+        {/* CTA Banner */}
+        <Card className="mb-8 overflow-hidden border-2 border-gradient-to-r from-amber-500 via-pink-500 to-violet-500">
+          <CardContent className="p-6 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-violet-500/10">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <h3 className="text-xl font-bold mb-1 bg-gradient-to-r from-amber-500 via-pink-500 to-violet-500 bg-clip-text text-transparent">
+                  Showcase Your Own Fit
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Create your wardrobe, track your style, share with the world
+                </p>
+              </div>
+              <Link to="/">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-amber-500 via-pink-500 to-violet-600 hover:from-amber-600 hover:via-pink-600 hover:to-violet-700 text-white font-semibold whitespace-nowrap"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Build Your Fit
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Category Filter */}
         {categories.length > 1 && (
           <div className="flex flex-wrap gap-2 justify-center mb-8">
@@ -276,11 +302,23 @@ export default function PublicShowcase() {
         )}
 
         {/* Footer */}
-        <footer className="text-center mt-12 pt-8 border-t">
+        <footer className="text-center mt-12 pt-8 border-t space-y-2">
           <p className="text-sm text-muted-foreground">
             Showcase powered by{' '}
             <Link to="/" className="text-primary hover:underline font-medium">
               Fitso.me
+            </Link>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <a
+              href={`mailto:shashank@fitso.me?subject=Report Inappropriate Content - ${username}'s Profile&body=Profile URL: ${window.location.href}%0A%0APlease describe the issue:%0A`}
+              className="hover:text-foreground transition-colors"
+            >
+              Report Inappropriate Content
+            </a>
+            {' · '}
+            <Link to="/privacy" className="hover:text-foreground transition-colors">
+              Privacy Policy
             </Link>
           </p>
         </footer>

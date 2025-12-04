@@ -14,7 +14,7 @@ import {
 import { enterDemoMode, type DemoType } from '@/lib/demo'
 import { ArrowRight, FlaskConical, Laptop, Lock, MapPin, Package, Shirt, Sparkles, Star, Watch, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 const USER_NAME_KEY = 'fitsome_user_name'
 
@@ -227,6 +227,15 @@ export default function Landing() {
                     </p>
                     <p className="text-xs text-muted-foreground/60">
                         Made with ✨ for people who like nice things
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mt-2">
+                        <Link to="/privacy" className="hover:text-foreground transition-colors">
+                            Privacy Policy
+                        </Link>
+                        {' · '}
+                        <a href="mailto:shashank@fitso.me" className="hover:text-foreground transition-colors">
+                            Contact
+                        </a>
                     </p>
                 </div>
             </footer>

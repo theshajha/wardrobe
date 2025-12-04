@@ -12,6 +12,7 @@ import Landing from './pages/Landing'
 import Outfits from './pages/Outfits'
 import Packing from './pages/Packing'
 import PhaseOut from './pages/PhaseOut'
+import Privacy from './pages/Privacy'
 import PublicShowcase from './pages/PublicShowcase'
 import Settings from './pages/Settings'
 import Showcase from './pages/Showcase'
@@ -41,8 +42,9 @@ export default function App() {
     const location = useLocation()
     const isLandingPage = location.pathname === '/'
     const isAuthPage = location.pathname.startsWith('/auth')
+    const isPrivacyPage = location.pathname === '/privacy'
     // Check if this is a public profile page (single path segment that's not a known route)
-    const knownRoutes = ['dashboard', 'inventory', 'showcase', 'packing', 'outfits', 'phase-out', 'wishlist', 'settings', 'auth']
+    const knownRoutes = ['dashboard', 'inventory', 'showcase', 'packing', 'outfits', 'phase-out', 'wishlist', 'settings', 'auth', 'privacy']
     const pathSegments = location.pathname.split('/').filter(Boolean)
     const isPublicProfile = pathSegments.length === 1 && !knownRoutes.includes(pathSegments[0])
     const isDemo = isDemoMode()
@@ -66,6 +68,17 @@ export default function App() {
             <AnalyticsProvider>
                 <Routes>
                     <Route path="/auth/verify" element={<AuthVerify />} />
+                </Routes>
+            </AnalyticsProvider>
+        )
+    }
+
+    // Privacy page without sidebar
+    if (isPrivacyPage) {
+        return (
+            <AnalyticsProvider>
+                <Routes>
+                    <Route path="/privacy" element={<Privacy />} />
                 </Routes>
             </AnalyticsProvider>
         )
