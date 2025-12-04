@@ -1,9 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Database, Lock, Mail, Shield, Users } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
 export default function Privacy() {
+  useEffect(() => {
+    document.title = 'Privacy Policy | Fitso.me'
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
       {/* Header */}
@@ -27,7 +32,7 @@ export default function Privacy() {
             We built Fitso.me with privacy at its core. Your data is yours, always.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Last updated: December 4, 2024
+            Last updated: December 4, 2025
           </p>
         </div>
 
@@ -247,7 +252,7 @@ export default function Privacy() {
         {/* Footer */}
         <footer className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
-            © 2024 Fitso.me · Built with privacy first 🔒
+            © 2025 Fitso.me · Built with privacy first 🔒
           </p>
         </footer>
       </main>

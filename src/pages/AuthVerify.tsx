@@ -20,6 +20,10 @@ export default function AuthVerify() {
     const [email, setEmail] = useState<string | null>(null);
 
     useEffect(() => {
+        document.title = 'Verifying... | Fitso.me';
+    }, []);
+
+    useEffect(() => {
         const verifyToken = async () => {
             // Get token from URL params
             const token = searchParams.get('token') || parseTokenFromUrl(window.location.href);

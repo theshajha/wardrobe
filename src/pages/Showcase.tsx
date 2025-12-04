@@ -51,6 +51,10 @@ export default function Showcase() {
         loadItems()
     }, [])
 
+    useEffect(() => {
+        document.title = 'Showcase | Fitso.me'
+    }, [])
+
     const loadItems = async () => {
         const data = await db.items.toArray()
         setItems(data)

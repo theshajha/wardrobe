@@ -138,6 +138,10 @@ export default function Settings() {
     setCurrentDemoType(getDemoType())
   }, [])
 
+  useEffect(() => {
+    document.title = 'Settings | Fitso.me'
+  }, [])
+
   const handleDemoToggle = async () => {
     if (isDemo) {
       setDemoLoading(true)

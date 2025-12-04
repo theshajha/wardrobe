@@ -38,6 +38,10 @@ export default function Outfits() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    document.title = 'Outfits | Fitso.me'
+  }, [])
+
   const loadData = async () => {
     const [itemsData, outfitsData] = await Promise.all([db.items.toArray(), db.outfits.toArray()])
     setItems(itemsData)

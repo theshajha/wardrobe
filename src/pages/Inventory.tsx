@@ -268,6 +268,10 @@ export default function Inventory() {
   useEffect(() => {
     setSubcategoryFilter('all')
   }, [categoryFilter])
+
+  useEffect(() => {
+    document.title = 'Inventory | Fitso.me'
+  }, [])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)

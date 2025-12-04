@@ -82,6 +82,34 @@ export default function PublicShowcase() {
     fetchShowcase();
   }, [username]);
 
+  // Update page title and meta description
+  useEffect(() => {
+    if (displayName && data) {
+      document.title = `${displayName}'s Fit | Fitso.me`;
+
+      // Update meta description
+      const metaDescription = document.querySelector('meta[name="description"]');
+      const description = `Check out ${displayName}'s wardrobe collection on Fitso.me - ${data.stats.totalItems} items curated with style.`;
+      if (metaDescription) {
+        metaDescription.setAttribute('content', description);
+      } else {
+        const meta = document.createElement('meta');
+        meta.name = 'description';
+        meta.content = description;
+        document.head.appendChild(meta);
+      }
+    }
+
+    // Cleanup: reset to default title when component unmounts
+    return () => {
+      document.title = 'Fitso.me - Your Wardrobe, Your Style, Your Way';
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', 'Manage your wardrobe, track your style, and showcase your fit. 100% private, all data stays in your browser.');
+      }
+    };
+  }, [displayName, data]);
+
   // Get unique categories
   const categories = data?.items
     ? [...new Set(data.items.map(item => item.category))]
@@ -173,6 +201,15 @@ export default function PublicShowcase() {
               <Shirt className="h-4 w-4" />
               {data?.stats.totalOutfits || 0} outfits
             </span>
+            <Link to="/">
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-amber-500 via-pink-500 to-violet-600 hover:from-amber-600 hover:via-pink-600 hover:to-violet-700 text-white font-semibold"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Build Your Fit
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -185,31 +222,6 @@ export default function PublicShowcase() {
             A curated collection of {data?.stats.totalItems || 0} items
           </p>
         </div>
-
-        {/* CTA Banner */}
-        <Card className="mb-8 overflow-hidden border-2 border-gradient-to-r from-amber-500 via-pink-500 to-violet-500">
-          <CardContent className="p-6 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-violet-500/10">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <h3 className="text-xl font-bold mb-1 bg-gradient-to-r from-amber-500 via-pink-500 to-violet-500 bg-clip-text text-transparent">
-                  Showcase Your Own Fit
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Create your wardrobe, track your style, share with the world
-                </p>
-              </div>
-              <Link to="/">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-amber-500 via-pink-500 to-violet-600 hover:from-amber-600 hover:via-pink-600 hover:to-violet-700 text-white font-semibold whitespace-nowrap"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Build Your Fit
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Category Filter */}
         {categories.length > 1 && (
@@ -302,25 +314,27 @@ export default function PublicShowcase() {
         )}
 
         {/* Footer */}
-        <footer className="text-center mt-12 pt-8 border-t space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Showcase powered by{' '}
-            <Link to="/" className="text-primary hover:underline font-medium">
-              Fitso.me
-            </Link>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            <a
-              href={`mailto:shashank@fitso.me?subject=Report Inappropriate Content - ${username}'s Profile&body=Profile URL: ${window.location.href}%0A%0APlease describe the issue:%0A`}
-              className="hover:text-foreground transition-colors"
-            >
-              Report Inappropriate Content
-            </a>
-            {' · '}
-            <Link to="/privacy" className="hover:text-foreground transition-colors">
-              Privacy Policy
-            </Link>
-          </p>
+        <footer className="mt-12 pt-8 border-t">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2">
+            <p className="text-sm text-muted-foreground">
+              Showcase powered by{' '}
+              <Link to="/" className="text-primary hover:underline font-medium">
+                Fitso.me
+              </Link>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <a
+                href={`mailto:shashank@fitso.me?subject=Report Inappropriate Content - ${username}'s Profile&body=Profile URL: ${window.location.href}%0A%0APlease describe the issue:%0A`}
+                className="hover:text-foreground transition-colors"
+              >
+                Report Inappropriate Content
+              </a>
+              {' · '}
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+            </p>
+          </div>
         </footer>
       </main>
     </div>

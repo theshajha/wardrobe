@@ -73,6 +73,10 @@ export default function Packing() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    document.title = 'Packing | Fitso.me'
+  }, [])
+
   const loadData = async () => {
     const [tripsData, tripItemsData, itemsData] = await Promise.all([
       db.trips.toArray(),

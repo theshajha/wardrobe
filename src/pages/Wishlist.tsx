@@ -79,6 +79,10 @@ export default function Wishlist() {
     loadItems()
   }, [])
 
+  useEffect(() => {
+    document.title = 'Wishlist | Fitso.me'
+  }, [])
+
   const loadItems = async () => {
     const data = await db.wishlist.toArray()
     // Sort: unpurchased first, then by priority (high > medium > low), then by date

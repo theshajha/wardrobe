@@ -32,6 +32,10 @@ export default function PhaseOut() {
     loadItems()
   }, [])
 
+  useEffect(() => {
+    document.title = 'Phase Out | Fitso.me'
+  }, [])
+
   const loadItems = async () => {
     const data = await db.items.toArray()
     setItems(data)

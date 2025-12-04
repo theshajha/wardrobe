@@ -60,6 +60,8 @@ export default function Landing() {
     const [demoLoading, setDemoLoading] = useState(false)
 
     useEffect(() => {
+        document.title = 'Fitso.me - Your Wardrobe, Your Style, Your Way'
+
         // Track landing page view
         trackLandingPageViewed()
 

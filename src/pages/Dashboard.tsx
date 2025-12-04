@@ -56,6 +56,10 @@ export default function Dashboard() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    document.title = 'Dashboard | Fitso.me'
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
