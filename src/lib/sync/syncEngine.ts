@@ -459,24 +459,20 @@ class SyncEngine {
                 // Case 1: ImageRefs match - definitely keep local imageData
                 if (itemRecord.imageRef === localItem.imageRef) {
                     itemRecord.imageData = localItem.imageData;
-                    console.log('[Sync] Preserving imageData for', itemRecord.name, '(matching imageRef)');
                 }
                 // Case 2: Server has imageRef but no imageData, and local has both
                 else if (itemRecord.imageRef && !itemRecord.imageData) {
                     // Server has updated imageRef, keep it but we'll need to download the new image
                     // Don't overwrite with local imageData - let download handle it
-                    console.log('[Sync] New imageRef from server for', itemRecord.name, '- will download');
                 }
                 // Case 3: Neither has imageRef - preserve local imageData (not yet uploaded)
                 else if (!itemRecord.imageRef && !localItem.imageRef) {
                     itemRecord.imageData = localItem.imageData;
-                    console.log('[Sync] Preserving imageData for', itemRecord.name, '(not yet synced to cloud)');
                 }
                 // Case 4: Local has imageData but no imageRef, server now has imageRef
                 else if (!localItem.imageRef && itemRecord.imageRef) {
                     // Image was uploaded from another device, use server's imageRef but clear local imageData
                     // It will be downloaded in the next step
-                    console.log('[Sync] Using server imageRef for', itemRecord.name, '- will download');
                 }
             }
 

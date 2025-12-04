@@ -163,29 +163,21 @@ export async function downloadImage(imageRef: string): Promise<{
 }> {
     const apiUrl = SYNC_API_URL;
     if (!apiUrl) {
-        console.error('[ImageSync] API URL not configured');
         return { success: false, error: 'Sync API not configured' };
     }
 
     try {
-        const url = `${apiUrl}/images/${encodeURIComponent(imageRef)}`;
-        console.log('[ImageSync] Downloading image from:', url, 'imageRef:', imageRef);
-
-        const response = await fetch(url, {
+        const response = await fetch(`${apiUrl}/images/${encodeURIComponent(imageRef)}`, {
             method: 'GET',
             headers: await getAuthHeaders(),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[ImageSync] Download failed:', response.status, errorText);
-            return { success: false, error: `Download failed: ${response.status} ${errorText}` };
+            return { success: false, error: 'Download failed' };
         }
 
         const blob = await response.blob();
-        console.log('[ImageSync] Downloaded blob:', blob.size, 'bytes, type:', blob.type);
         const base64 = await blobToBase64(blob);
-        console.log('[ImageSync] Converted to base64, length:', base64.length);
 
         return { success: true, data: base64 };
     } catch (error) {
@@ -261,18 +253,6 @@ export async function downloadMissingImages(
         .toArray();
 
     const total = items.length;
-    console.log(`[ImageSync] Found ${total} items needing image download`);
-
-    if (total > 0) {
-        console.log('[ImageSync] Sample items:', items.slice(0, 3).map(i => ({
-            id: i.id,
-            name: i.name,
-            imageRef: i.imageRef,
-            hasImageData: !!i.imageData,
-            syncStatus: i.imageSyncStatus
-        })));
-    }
-
     let downloaded = 0;
     let failed = 0;
 
@@ -286,7 +266,6 @@ export async function downloadMissingImages(
 
             if (!item.imageRef) continue;
 
-            console.log(`[ImageSync] Downloading ${i + 1}/${total}: ${item.name} (${item.imageRef})`);
             const result = await downloadImage(item.imageRef);
             if (result.success && result.data) {
                 // Store downloaded image
@@ -294,13 +273,11 @@ export async function downloadMissingImages(
                     imageData: result.data,
                     imageSyncStatus: 'synced' as ImageSyncStatus,
                 });
-                console.log(`[ImageSync] ✓ Downloaded: ${item.name}`);
                 downloaded++;
             } else {
                 await db.items.update(item.id, {
                     imageSyncStatus: 'error' as ImageSyncStatus,
                 });
-                console.error(`[ImageSync] ✗ Failed: ${item.name} - ${result.error}`);
                 failed++;
             }
         }
@@ -308,7 +285,6 @@ export async function downloadMissingImages(
         setTrackingEnabled(true);
     }
 
-    console.log(`[ImageSync] Download complete: ${downloaded} succeeded, ${failed} failed`);
     return { downloaded, failed };
 }
 
@@ -382,78 +358,5 @@ export async function getImageSyncStats(): Promise<{
     }
 
     return stats;
-}
-
-/**
- * Diagnostic function to check image state of all items
- * Run from console: window.diagnoseImages()
- */
-export async function diagnoseImages(): Promise<void> {
-    const items = await db.items.toArray();
-    const withImages = items.filter(i => i.imageData || i.imageRef);
-
-    console.log('=== IMAGE DIAGNOSTIC ===');
-    console.log(`Total items: ${items.length}`);
-    console.log(`Items with images: ${withImages.length}\n`);
-
-    const categories = {
-        perfect: [] as any[],
-        hasDataNoRef: [] as any[],
-        hasRefNoData: [] as any[],
-        hasNeither: [] as any[],
-    };
-
-    for (const item of withImages) {
-        const state = {
-            name: item.name,
-            hasImageData: !!item.imageData,
-            hasImageRef: !!item.imageRef,
-            imageRef: item.imageRef,
-            syncStatus: item.imageSyncStatus,
-            imageDataLength: item.imageData?.length || 0,
-        };
-
-        if (item.imageData && item.imageRef) {
-            categories.perfect.push(state);
-        } else if (item.imageData && !item.imageRef) {
-            categories.hasDataNoRef.push(state);
-        } else if (!item.imageData && item.imageRef) {
-            categories.hasRefNoData.push(state);
-        } else {
-            categories.hasNeither.push(state);
-        }
-    }
-
-    console.log(`✅ Perfect (has both imageData & imageRef): ${categories.perfect.length}`);
-    if (categories.perfect.length > 0) {
-        console.table(categories.perfect.slice(0, 5));
-    }
-
-    console.log(`\n⚠️  Has imageData but NO imageRef (not uploaded): ${categories.hasDataNoRef.length}`);
-    if (categories.hasDataNoRef.length > 0) {
-        console.table(categories.hasDataNoRef.slice(0, 5));
-        console.log('→ These images need to be uploaded to cloud');
-    }
-
-    console.log(`\n📥 Has imageRef but NO imageData (needs download): ${categories.hasRefNoData.length}`);
-    if (categories.hasRefNoData.length > 0) {
-        console.table(categories.hasRefNoData.slice(0, 5));
-        console.log('→ These images will be downloaded on next sync');
-    }
-
-    console.log(`\n❌ Has neither: ${categories.hasNeither.length}`);
-
-    console.log('\n=== RECOMMENDATIONS ===');
-    if (categories.hasDataNoRef.length > 0) {
-        console.log('- Run sync to upload local images to cloud');
-    }
-    if (categories.hasRefNoData.length > 0) {
-        console.log('- Run sync to download missing images from cloud');
-    }
-}
-
-// Expose to window for console access
-if (typeof window !== 'undefined') {
-    (window as any).diagnoseImages = diagnoseImages;
 }
 
