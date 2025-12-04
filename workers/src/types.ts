@@ -4,8 +4,7 @@
 
 // Cloudflare bindings
 export interface Env {
-  R2_METADATA: R2Bucket;
-  R2_IMAGES: R2Bucket;
+  R2_BUCKET: R2Bucket;  // Single bucket for all user data: {userId}/data.json and {userId}/images/{hash}
   AUTH_KV: KVNamespace;
 
   // Environment variables

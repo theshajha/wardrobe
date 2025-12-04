@@ -1,7 +1,8 @@
 /**
  * Image Routes for Fitso.me Sync API
  * Handles image upload/download with R2 storage
- * Images are stored per-user: users/{userId}/images/{hash}
+ * Images are stored per-user: {userId}/images/{hash}
+ * Same bucket as metadata: {userId}/data.json
  */
 
 import { Hono } from 'hono';
@@ -25,10 +26,10 @@ const ALLOWED_CONTENT_TYPES = [
 ];
 
 /**
- * Build user-scoped image key
+ * Build user-scoped image key: {userId}/images/{hash}
  */
 function buildImageKey(userId: string, hash: string): string {
-  return `users/${userId}/images/${hash}`;
+  return `${userId}/images/${hash}`;
 }
 
 /**
@@ -63,7 +64,7 @@ imagesRouter.post('/presign-upload', async (c) => {
     const imageKey = buildImageKey(session.userId, hash);
 
     // Check if image already exists for this user (per-user deduplication)
-    const existing = await c.env.R2_IMAGES.head(imageKey);
+    const existing = await c.env.R2_BUCKET.head(imageKey);
     if (existing) {
       return c.json({
         success: true,
@@ -123,7 +124,7 @@ imagesRouter.put('/upload/:hash', async (c) => {
     const imageKey = buildImageKey(session.userId, hash);
 
     // Check if already exists for this user
-    const existing = await c.env.R2_IMAGES.head(imageKey);
+    const existing = await c.env.R2_BUCKET.head(imageKey);
     if (existing) {
       return c.json({
         success: true,
@@ -141,7 +142,7 @@ imagesRouter.put('/upload/:hash', async (c) => {
       uploadedBy: session.userId,
     };
 
-    await c.env.R2_IMAGES.put(imageKey, body, {
+    await c.env.R2_BUCKET.put(imageKey, body, {
       httpMetadata: {
         contentType,
         cacheControl: 'public, max-age=31536000, immutable',
@@ -174,7 +175,7 @@ imagesRouter.get('/check/:hash', async (c) => {
 
     // Check in user's image folder
     const imageKey = buildImageKey(session.userId, hash);
-    const existing = await c.env.R2_IMAGES.head(imageKey);
+    const existing = await c.env.R2_BUCKET.head(imageKey);
 
     return c.json({ exists: !!existing });
   } catch (error) {
@@ -196,13 +197,13 @@ imagesRouter.get('/:path{.+}', async (c) => {
       return c.json({ error: 'Path required' }, 400);
     }
 
-    // The path should be the full imageRef (users/{userId}/images/{hash})
+    // The path should be the full imageRef ({userId}/images/{hash})
     // or just the hash for backward compatibility
     let imageKey: string;
 
-    if (path.startsWith('users/')) {
+    if (path.includes('/images/')) {
       // Full path provided - verify it belongs to this user
-      if (!path.startsWith(`users/${session.userId}/`)) {
+      if (!path.startsWith(`${session.userId}/`)) {
         return c.json({ error: 'Access denied' }, 403);
       }
       imageKey = path;
@@ -212,7 +213,7 @@ imagesRouter.get('/:path{.+}', async (c) => {
       imageKey = buildImageKey(session.userId, hash);
     }
 
-    const object = await c.env.R2_IMAGES.get(imageKey);
+    const object = await c.env.R2_BUCKET.get(imageKey);
 
     if (!object) {
       return c.json({ error: 'Image not found' }, 404);
@@ -253,12 +254,12 @@ imagesRouter.delete('/:hash', async (c) => {
     const imageKey = buildImageKey(session.userId, hash);
 
     // Check if image exists
-    const object = await c.env.R2_IMAGES.head(imageKey);
+    const object = await c.env.R2_BUCKET.head(imageKey);
     if (!object) {
       return c.json({ success: true, message: 'Image already deleted' });
     }
 
-    await c.env.R2_IMAGES.delete(imageKey);
+    await c.env.R2_BUCKET.delete(imageKey);
 
     return c.json({ success: true });
   } catch (error) {

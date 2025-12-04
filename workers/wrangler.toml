@@ -12,16 +12,12 @@ ENVIRONMENT = "development"
 APP_URL = "http://localhost:5173"
 CORS_ORIGINS = "http://localhost:5173,https://fitso.me"
 
-# R2 Storage Buckets
+# R2 Storage Bucket - single bucket for all user data
+# Structure: {userId}/data.json (metadata) and {userId}/images/{hash} (images)
 [[r2_buckets]]
-binding = "R2_METADATA"
-bucket_name = "fitsome-metadata"
-preview_bucket_name = "fitsome-metadata-preview"
-
-[[r2_buckets]]
-binding = "R2_IMAGES"
-bucket_name = "fitsome-images"
-preview_bucket_name = "fitsome-images-preview"
+binding = "R2_BUCKET"
+bucket_name = "fitsome-data"
+preview_bucket_name = "fitsome-data-preview"
 
 # KV Namespace for auth tokens and rate limiting
 [[kv_namespaces]]
@@ -34,12 +30,8 @@ preview_id = "7c2ad6286e974f8bbba6d9d657862904"
 vars = { ENVIRONMENT = "production", APP_URL = "https://fitso.me", CORS_ORIGINS = "https://fitso.me,https://www.fitso.me,http://localhost:5173,http://localhost:4173" }
 
 [[env.production.r2_buckets]]
-binding = "R2_METADATA"
-bucket_name = "fitsome-metadata"
-
-[[env.production.r2_buckets]]
-binding = "R2_IMAGES"
-bucket_name = "fitsome-images"
+binding = "R2_BUCKET"
+bucket_name = "fitsome-data"
 
 [[env.production.kv_namespaces]]
 binding = "AUTH_KV"

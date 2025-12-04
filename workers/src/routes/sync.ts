@@ -4,24 +4,24 @@
  */
 
 import { Hono } from 'hono';
-import type { 
-  Env, 
-  Session, 
-  UserData, 
-  SyncPullResponse, 
-  SyncPushRequest, 
-  SyncPushResponse,
+import type {
+  Env,
   LocalChange,
+  Session,
   SyncItem,
+  SyncOutfit,
+  SyncPullResponse,
+  SyncPushRequest,
+  SyncPushResponse,
   SyncTrip,
   SyncTripItem,
-  SyncOutfit,
   SyncWishlistItem,
+  UserData,
 } from '../types';
 
-export const syncRouter = new Hono<{ 
-  Bindings: Env; 
-  Variables: { session: Session } 
+export const syncRouter = new Hono<{
+  Bindings: Env;
+  Variables: { session: Session }
 }>();
 
 type SyncableRecord = SyncItem | SyncTrip | SyncTripItem | SyncOutfit | SyncWishlistItem;
@@ -35,9 +35,9 @@ syncRouter.get('/', async (c) => {
     const session = c.get('session');
     const sinceVersion = parseInt(c.req.query('since') || '0', 10);
 
-    // Get user data from R2
-    const userDataKey = `users/${session.userId}/data.json`;
-    const dataObject = await c.env.R2_METADATA.get(userDataKey);
+    // Get user data from R2 - stored at {userId}/data.json
+    const userDataKey = `${session.userId}/data.json`;
+    const dataObject = await c.env.R2_BUCKET.get(userDataKey);
 
     if (!dataObject) {
       // No data yet, return empty
@@ -123,9 +123,9 @@ syncRouter.post('/', async (c) => {
       return c.json({ success: false, error: 'Invalid changes format' } as SyncPushResponse, 400);
     }
 
-    // Get current user data from R2
-    const userDataKey = `users/${session.userId}/data.json`;
-    const dataObject = await c.env.R2_METADATA.get(userDataKey);
+    // Get current user data from R2 - stored at {userId}/data.json
+    const userDataKey = `${session.userId}/data.json`;
+    const dataObject = await c.env.R2_BUCKET.get(userDataKey);
 
     let userData: UserData;
     if (dataObject) {
@@ -145,7 +145,7 @@ syncRouter.post('/', async (c) => {
 
     // Check for version conflict (optimistic locking)
     const conflictIds: string[] = [];
-    
+
     if (lastSyncVersion !== userData.version) {
       // There are server changes the client doesn't have
       // We'll still apply changes using LWW, but flag conflicts
@@ -165,9 +165,9 @@ syncRouter.post('/', async (c) => {
     userData.updatedAt = new Date().toISOString();
 
     // Save updated data to R2
-    await c.env.R2_METADATA.put(userDataKey, JSON.stringify(userData), {
-      customMetadata: { 
-        userId: session.userId, 
+    await c.env.R2_BUCKET.put(userDataKey, JSON.stringify(userData), {
+      customMetadata: {
+        userId: session.userId,
         version: String(userData.version),
         updatedAt: userData.updatedAt,
       },
@@ -190,11 +190,11 @@ syncRouter.post('/', async (c) => {
  * Apply a single change to user data using Last-Write-Wins
  */
 function applyChange(
-  userData: UserData, 
+  userData: UserData,
   change: LocalChange
 ): { applied: boolean; conflict: boolean } {
   const { table, recordId, operation, payload, timestamp } = change;
-  
+
   // Get the appropriate array from userData
   const dataArray = getDataArray(userData, table);
   if (!dataArray) {
@@ -208,7 +208,7 @@ function applyChange(
   if (existingRecord) {
     const existingTime = new Date(getUpdatedAt(existingRecord)).getTime();
     const changeTime = new Date(timestamp).getTime();
-    
+
     if (changeTime <= existingTime) {
       // Existing record is newer or same time, don't apply
       return { applied: false, conflict: true };

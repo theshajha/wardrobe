@@ -6,13 +6,13 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import {
+  checkRateLimit,
+  createSessionToken,
   generateToken,
   generateUserId,
-  createSessionToken,
+  sendMagicLinkEmail,
   storeMagicLinkToken,
   verifyMagicLinkToken,
-  sendMagicLinkEmail,
-  checkRateLimit,
   verifySession,
 } from '../utils/auth';
 
@@ -34,9 +34,9 @@ authRouter.post('/magic-link', async (c) => {
     // Rate limit check
     const rateLimit = await checkRateLimit(email, c.env);
     if (!rateLimit.allowed) {
-      return c.json({ 
-        success: false, 
-        error: `Please wait ${rateLimit.retryAfter} seconds before requesting another link` 
+      return c.json({
+        success: false,
+        error: `Please wait ${rateLimit.retryAfter} seconds before requesting another link`
       }, 429);
     }
 
@@ -46,14 +46,14 @@ authRouter.post('/magic-link', async (c) => {
 
     // Send email
     const sent = await sendMagicLinkEmail(email, token, c.env);
-    
+
     if (!sent && c.env.ENVIRONMENT !== 'development') {
       return c.json({ success: false, error: 'Failed to send email' }, 500);
     }
 
-    return c.json({ 
-      success: true, 
-      message: 'Check your email for the magic link!' 
+    return c.json({
+      success: true,
+      message: 'Check your email for the magic link!'
     });
   } catch (error) {
     console.error('Magic link request error:', error);
@@ -76,7 +76,7 @@ authRouter.post('/verify', async (c) => {
 
     // Verify and consume the magic link token
     const email = await verifyMagicLinkToken(token, c.env);
-    
+
     if (!email) {
       return c.json({ success: false, error: 'Invalid or expired token' }, 401);
     }
@@ -85,10 +85,10 @@ authRouter.post('/verify', async (c) => {
     const userId = await generateUserId(email);
     const sessionToken = await createSessionToken(userId, email, c.env);
 
-    // Initialize user data in R2 if needed
-    const userDataKey = `users/${userId}/data.json`;
-    const existingData = await c.env.R2_METADATA.get(userDataKey);
-    
+    // Initialize user data in R2 if needed - stored at {userId}/data.json
+    const userDataKey = `${userId}/data.json`;
+    const existingData = await c.env.R2_BUCKET.get(userDataKey);
+
     if (!existingData) {
       // Create initial user data
       const initialData = {
@@ -100,8 +100,8 @@ authRouter.post('/verify', async (c) => {
         outfits: [],
         wishlist: [],
       };
-      
-      await c.env.R2_METADATA.put(userDataKey, JSON.stringify(initialData), {
+
+      await c.env.R2_BUCKET.put(userDataKey, JSON.stringify(initialData), {
         customMetadata: { userId, email },
       });
     }
@@ -134,7 +134,7 @@ authRouter.get('/validate', async (c) => {
 
     const token = authHeader.slice(7);
     const session = await verifySession(token, c.env);
-    
+
     if (!session) {
       return c.json({ valid: false }, 401);
     }
