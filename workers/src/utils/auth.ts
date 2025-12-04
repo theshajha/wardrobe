@@ -43,6 +43,17 @@ export function generateBaseUsername(email: string): string {
 }
 
 /**
+ * Generate a display name from email
+ * Capitalizes first letter of local part
+ */
+export function generateDisplayName(email: string): string {
+  const localPart = email.toLowerCase().trim().split('@')[0];
+  // Remove dots and underscores, capitalize first letter
+  const cleaned = localPart.replace(/[._-]/g, ' ').trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
  * Get or create a unique username for an email
  * Stores mapping in KV: email:{email} -> {username, userId, createdAt}
  * Also stores reverse: username:{username} -> {email, userId}
@@ -82,6 +93,7 @@ export async function getOrCreateUsername(
 
   // Store mappings
   const now = new Date().toISOString();
+  const displayName = generateDisplayName(email);
 
   // email -> username mapping
   await env.AUTH_KV.put(emailKey, JSON.stringify({
@@ -97,6 +109,7 @@ export async function getOrCreateUsername(
     userId,
     createdAt: now,
     showcaseEnabled: false,  // Default: showcase disabled
+    displayName,  // Default display name from email
   }));
 
   return username;
@@ -108,7 +121,7 @@ export async function getOrCreateUsername(
 export async function getUserByUsername(
   username: string,
   env: Env
-): Promise<{ email: string; userId: string; showcaseEnabled: boolean } | null> {
+): Promise<{ email: string; userId: string; showcaseEnabled: boolean; displayName?: string } | null> {
   const data = await env.AUTH_KV.get(`username:${username.toLowerCase()}`);
   if (!data) return null;
   return JSON.parse(data);
@@ -128,6 +141,24 @@ export async function updateShowcaseSetting(
 
   const userData = JSON.parse(data);
   userData.showcaseEnabled = enabled;
+  await env.AUTH_KV.put(key, JSON.stringify(userData));
+  return true;
+}
+
+/**
+ * Update display name for a user
+ */
+export async function updateDisplayName(
+  username: string,
+  displayName: string,
+  env: Env
+): Promise<boolean> {
+  const key = `username:${username.toLowerCase()}`;
+  const data = await env.AUTH_KV.get(key);
+  if (!data) return false;
+
+  const userData = JSON.parse(data);
+  userData.displayName = displayName.trim();
   await env.AUTH_KV.put(key, JSON.stringify(userData));
   return true;
 }

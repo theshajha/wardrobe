@@ -13,6 +13,7 @@ import {
   getOrCreateUsername,
   sendMagicLinkEmail,
   storeMagicLinkToken,
+  updateDisplayName,
   updateShowcaseSetting,
   verifyMagicLinkToken,
   verifySession,
@@ -228,9 +229,51 @@ authRouter.get('/showcase', async (c) => {
       username: session.username,
       showcaseEnabled: data.showcaseEnabled || false,
       showcaseUrl: data.showcaseEnabled ? `/${session.username}` : null,
+      displayName: data.displayName || session.username,
     });
   } catch (error) {
     console.error('Showcase status error:', error);
+    return c.json({ success: false, error: 'Server error' }, 500);
+  }
+});
+
+/**
+ * POST /auth/display-name
+ * Update display name for authenticated user
+ */
+authRouter.post('/display-name', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+
+    const token = authHeader.slice(7);
+    const session = await verifySession(token, c.env);
+
+    if (!session) {
+      return c.json({ success: false, error: 'Invalid session' }, 401);
+    }
+
+    const body = await c.req.json<{ displayName: string }>();
+    const displayName = body.displayName?.trim();
+
+    if (!displayName || displayName.length < 1 || displayName.length > 50) {
+      return c.json({ success: false, error: 'Display name must be 1-50 characters' }, 400);
+    }
+
+    const success = await updateDisplayName(session.username, displayName, c.env);
+
+    if (!success) {
+      return c.json({ success: false, error: 'Failed to update display name' }, 500);
+    }
+
+    return c.json({
+      success: true,
+      displayName,
+    });
+  } catch (error) {
+    console.error('Display name update error:', error);
     return c.json({ success: false, error: 'Server error' }, 500);
   }
 });

@@ -2,13 +2,15 @@ import { SyncSettings } from '@/components/SyncSettings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { exportAllData, exportWithImages, getStorageStats, importAllData, importWithImages } from '@/db'
+import { exportAllData, exportWithImages, getSyncMeta, getStorageStats, importAllData, importWithImages } from '@/db'
 import { hasOptedOut, isAnalyticsEnabled, optIn, optOut, trackDataExported, trackDataImported, trackDemoEntered } from '@/lib/analytics'
 import { enterDemoMode, exitDemoMode, getDemoType, getDemoTypeLabel, isDemoMode, type DemoType } from '@/lib/demo'
+import { SYNC_API_URL } from '@/lib/sync/types'
 import { formatBytes } from '@/lib/utils'
 import { useShowcase } from '@/hooks/useShowcase'
 import { useSync } from '@/hooks/useSync'
@@ -123,6 +125,10 @@ export default function Settings() {
   const [showcaseCopied, setShowcaseCopied] = useState(false)
   const [showShowcaseInfo, setShowShowcaseInfo] = useState(false)
 
+  // Display name state
+  const [displayName, setDisplayName] = useState('')
+  const [displayNameSaved, setDisplayNameSaved] = useState(false)
+
   useEffect(() => {
     loadStorageStats()
     loadExportSettings()
@@ -167,6 +173,52 @@ export default function Settings() {
       setTimeout(() => setShowcaseCopied(false), 2000)
     }
   }
+
+  const handleDisplayNameSave = async () => {
+    if (!syncState.isAuthenticated || !displayName.trim()) return
+
+    try {
+      const meta = await getSyncMeta()
+      const response = await fetch(`${SYNC_API_URL}/auth/display-name`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${meta.sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ displayName: displayName.trim() }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setDisplayNameSaved(true)
+        setTimeout(() => setDisplayNameSaved(false), 2000)
+        showcase.refresh() // Refresh showcase to update display name
+      }
+    } catch (error) {
+      console.error('Failed to update display name:', error)
+    }
+  }
+
+  // Load display name from showcase
+  useEffect(() => {
+    if (syncState.isAuthenticated && showcase.username) {
+      // Get display name from showcase API
+      const fetchDisplayName = async () => {
+        try {
+          const meta = await getSyncMeta()
+          const response = await fetch(`${SYNC_API_URL}/auth/showcase`, {
+            headers: { 'Authorization': `Bearer ${meta.sessionToken}` },
+          })
+          const data = await response.json()
+          if (data.success && data.displayName) {
+            setDisplayName(data.displayName)
+          }
+        } catch (error) {
+          console.error('Failed to fetch display name:', error)
+        }
+      }
+      fetchDisplayName()
+    }
+  }, [syncState.isAuthenticated, showcase.username])
 
   // Auto-export check on mount and interval
   useEffect(() => {
@@ -438,6 +490,36 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Display Name */}
+              {syncState.isAuthenticated && (
+                <div className="space-y-2">
+                  <Label htmlFor="displayName" className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Display Name
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="displayName"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Your name"
+                      maxLength={50}
+                      className="max-w-xs"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleDisplayNameSave}
+                      disabled={!displayName.trim()}
+                    >
+                      {displayNameSaved ? <Check className="h-4 w-4" /> : 'Save'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This name appears on your public profile as "{displayName || 'Your Name'}'s Fit"
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="currency" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />

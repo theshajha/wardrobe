@@ -47,6 +47,7 @@ export default function PublicShowcase() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ShowcaseData | null>(null);
+  const [displayName, setDisplayName] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +69,7 @@ export default function PublicShowcase() {
         }
 
         setData(result.data);
+        setDisplayName(result.displayName || username);
         setLoading(false);
       } catch (err) {
         console.error('Showcase fetch error:', err);
@@ -177,7 +179,7 @@ export default function PublicShowcase() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">{username}'s Wardrobe</h1>
+          <h1 className="text-3xl font-bold mb-2">{displayName}'s Fit</h1>
           <p className="text-muted-foreground">
             A curated collection of {data?.stats.totalItems || 0} items
           </p>
@@ -216,7 +218,7 @@ export default function PublicShowcase() {
                 item.isFeatured && "ring-2 ring-amber-500/50"
               )}
             >
-              <div className="aspect-square bg-secondary/30 relative">
+              <div className="aspect-square relative">
                 {getImageUrl(item) ? (
                   <img
                     src={getImageUrl(item)!}
@@ -225,8 +227,18 @@ export default function PublicShowcase() {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Shirt className="h-12 w-12 text-muted-foreground/30" />
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={item.color ? {
+                      background: `linear-gradient(135deg, ${item.color}, ${item.color}dd)`
+                    } : undefined}
+                  >
+                    <Shirt
+                      className="h-12 w-12"
+                      style={{
+                        color: item.color ? 'rgba(255, 255, 255, 0.8)' : 'rgba(161, 161, 170, 0.3)'
+                      }}
+                    />
                   </div>
                 )}
                 {item.isFeatured && (
