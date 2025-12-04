@@ -384,3 +384,76 @@ export async function getImageSyncStats(): Promise<{
     return stats;
 }
 
+/**
+ * Diagnostic function to check image state of all items
+ * Run from console: window.diagnoseImages()
+ */
+export async function diagnoseImages(): Promise<void> {
+    const items = await db.items.toArray();
+    const withImages = items.filter(i => i.imageData || i.imageRef);
+
+    console.log('=== IMAGE DIAGNOSTIC ===');
+    console.log(`Total items: ${items.length}`);
+    console.log(`Items with images: ${withImages.length}\n`);
+
+    const categories = {
+        perfect: [] as any[],
+        hasDataNoRef: [] as any[],
+        hasRefNoData: [] as any[],
+        hasNeither: [] as any[],
+    };
+
+    for (const item of withImages) {
+        const state = {
+            name: item.name,
+            hasImageData: !!item.imageData,
+            hasImageRef: !!item.imageRef,
+            imageRef: item.imageRef,
+            syncStatus: item.imageSyncStatus,
+            imageDataLength: item.imageData?.length || 0,
+        };
+
+        if (item.imageData && item.imageRef) {
+            categories.perfect.push(state);
+        } else if (item.imageData && !item.imageRef) {
+            categories.hasDataNoRef.push(state);
+        } else if (!item.imageData && item.imageRef) {
+            categories.hasRefNoData.push(state);
+        } else {
+            categories.hasNeither.push(state);
+        }
+    }
+
+    console.log(`✅ Perfect (has both imageData & imageRef): ${categories.perfect.length}`);
+    if (categories.perfect.length > 0) {
+        console.table(categories.perfect.slice(0, 5));
+    }
+
+    console.log(`\n⚠️  Has imageData but NO imageRef (not uploaded): ${categories.hasDataNoRef.length}`);
+    if (categories.hasDataNoRef.length > 0) {
+        console.table(categories.hasDataNoRef.slice(0, 5));
+        console.log('→ These images need to be uploaded to cloud');
+    }
+
+    console.log(`\n📥 Has imageRef but NO imageData (needs download): ${categories.hasRefNoData.length}`);
+    if (categories.hasRefNoData.length > 0) {
+        console.table(categories.hasRefNoData.slice(0, 5));
+        console.log('→ These images will be downloaded on next sync');
+    }
+
+    console.log(`\n❌ Has neither: ${categories.hasNeither.length}`);
+
+    console.log('\n=== RECOMMENDATIONS ===');
+    if (categories.hasDataNoRef.length > 0) {
+        console.log('- Run sync to upload local images to cloud');
+    }
+    if (categories.hasRefNoData.length > 0) {
+        console.log('- Run sync to download missing images from cloud');
+    }
+}
+
+// Expose to window for console access
+if (typeof window !== 'undefined') {
+    (window as any).diagnoseImages = diagnoseImages;
+}
+

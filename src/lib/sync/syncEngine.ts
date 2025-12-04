@@ -445,14 +445,39 @@ class SyncEngine {
      * Preserves local imageData for items when syncing from server
      */
     private async upsertRecord(table: SyncTable, record: SyncableRecord): Promise<void> {
-        // For items table, preserve local imageData if it exists
+        // For items table, intelligently preserve local imageData
         if (table === 'items') {
             const itemRecord = record as Item;
             const localItem = await db.items.get(itemRecord.id);
 
-            // If local item has imageData and server record has matching imageRef, preserve the local imageData
-            if (localItem?.imageData && itemRecord.imageRef === localItem.imageRef) {
-                itemRecord.imageData = localItem.imageData;
+            // Preserve local imageData in these scenarios:
+            // 1. Server has same imageRef as local (same image in cloud)
+            // 2. Server has no imageData and local has imageData (server never stores base64)
+            // 3. Local has imageData but no imageRef (image not yet uploaded)
+
+            if (localItem?.imageData) {
+                // Case 1: ImageRefs match - definitely keep local imageData
+                if (itemRecord.imageRef === localItem.imageRef) {
+                    itemRecord.imageData = localItem.imageData;
+                    console.log('[Sync] Preserving imageData for', itemRecord.name, '(matching imageRef)');
+                }
+                // Case 2: Server has imageRef but no imageData, and local has both
+                else if (itemRecord.imageRef && !itemRecord.imageData) {
+                    // Server has updated imageRef, keep it but we'll need to download the new image
+                    // Don't overwrite with local imageData - let download handle it
+                    console.log('[Sync] New imageRef from server for', itemRecord.name, '- will download');
+                }
+                // Case 3: Neither has imageRef - preserve local imageData (not yet uploaded)
+                else if (!itemRecord.imageRef && !localItem.imageRef) {
+                    itemRecord.imageData = localItem.imageData;
+                    console.log('[Sync] Preserving imageData for', itemRecord.name, '(not yet synced to cloud)');
+                }
+                // Case 4: Local has imageData but no imageRef, server now has imageRef
+                else if (!localItem.imageRef && itemRecord.imageRef) {
+                    // Image was uploaded from another device, use server's imageRef but clear local imageData
+                    // It will be downloaded in the next step
+                    console.log('[Sync] Using server imageRef for', itemRecord.name, '- will download');
+                }
             }
 
             await db.items.put(itemRecord);
