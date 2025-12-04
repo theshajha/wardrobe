@@ -163,21 +163,29 @@ export async function downloadImage(imageRef: string): Promise<{
 }> {
     const apiUrl = SYNC_API_URL;
     if (!apiUrl) {
+        console.error('[ImageSync] API URL not configured');
         return { success: false, error: 'Sync API not configured' };
     }
 
     try {
-        const response = await fetch(`${apiUrl}/images/${encodeURIComponent(imageRef)}`, {
+        const url = `${apiUrl}/images/${encodeURIComponent(imageRef)}`;
+        console.log('[ImageSync] Downloading image from:', url, 'imageRef:', imageRef);
+
+        const response = await fetch(url, {
             method: 'GET',
             headers: await getAuthHeaders(),
         });
 
         if (!response.ok) {
-            return { success: false, error: 'Download failed' };
+            const errorText = await response.text();
+            console.error('[ImageSync] Download failed:', response.status, errorText);
+            return { success: false, error: `Download failed: ${response.status} ${errorText}` };
         }
 
         const blob = await response.blob();
+        console.log('[ImageSync] Downloaded blob:', blob.size, 'bytes, type:', blob.type);
         const base64 = await blobToBase64(blob);
+        console.log('[ImageSync] Converted to base64, length:', base64.length);
 
         return { success: true, data: base64 };
     } catch (error) {
@@ -253,6 +261,18 @@ export async function downloadMissingImages(
         .toArray();
 
     const total = items.length;
+    console.log(`[ImageSync] Found ${total} items needing image download`);
+
+    if (total > 0) {
+        console.log('[ImageSync] Sample items:', items.slice(0, 3).map(i => ({
+            id: i.id,
+            name: i.name,
+            imageRef: i.imageRef,
+            hasImageData: !!i.imageData,
+            syncStatus: i.imageSyncStatus
+        })));
+    }
+
     let downloaded = 0;
     let failed = 0;
 
@@ -266,6 +286,7 @@ export async function downloadMissingImages(
 
             if (!item.imageRef) continue;
 
+            console.log(`[ImageSync] Downloading ${i + 1}/${total}: ${item.name} (${item.imageRef})`);
             const result = await downloadImage(item.imageRef);
             if (result.success && result.data) {
                 // Store downloaded image
@@ -273,11 +294,13 @@ export async function downloadMissingImages(
                     imageData: result.data,
                     imageSyncStatus: 'synced' as ImageSyncStatus,
                 });
+                console.log(`[ImageSync] ✓ Downloaded: ${item.name}`);
                 downloaded++;
             } else {
                 await db.items.update(item.id, {
                     imageSyncStatus: 'error' as ImageSyncStatus,
                 });
+                console.error(`[ImageSync] ✗ Failed: ${item.name} - ${result.error}`);
                 failed++;
             }
         }
@@ -285,6 +308,7 @@ export async function downloadMissingImages(
         setTrackingEnabled(true);
     }
 
+    console.log(`[ImageSync] Download complete: ${downloaded} succeeded, ${failed} failed`);
     return { downloaded, failed };
 }
 
