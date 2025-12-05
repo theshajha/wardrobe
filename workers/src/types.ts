@@ -16,6 +16,7 @@ export interface Env {
   RESEND_API_KEY?: string;
   JWT_SECRET?: string;
   EMAIL_FROM?: string;
+  MIGRATION_SECRET?: string;  // For one-time R2 to Supabase migration
 }
 
 // User data stored in R2

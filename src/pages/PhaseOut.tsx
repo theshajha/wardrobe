@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
-import { Package, Shirt, Watch, Laptop, Briefcase, Footprints, AlertTriangle, Clock, Trash2, RefreshCw, Check } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { db, type Item } from '@/db'
-import { cn, getItemAge, formatDate } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { Item } from '@/db'
+import { useItems } from '@/hooks/useItems'
+import { getImageUrl } from '@/lib/imageUrl'
+import { cn, formatDate, getItemAge } from '@/lib/utils'
+import { AlertTriangle, Briefcase, Check, Clock, Footprints, Laptop, Package, RefreshCw, Shirt, Trash2, Watch } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 const categoryIcons: Record<string, typeof Package> = {
   clothing: Shirt,
@@ -24,34 +27,34 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function PhaseOut() {
-  const [items, setItems] = useState<Item[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deleteItem, setDeleteItem] = useState<Item | null>(null)
-
-  useEffect(() => {
-    loadItems()
-  }, [])
+  // Use unified items hook for Supabase/local storage
+  const { items, isLoading: loading, updateItem, deleteItem: deleteItemFromStore } = useItems()
+  const [deleteItemState, setDeleteItemState] = useState<Item | null>(null)
 
   useEffect(() => {
     document.title = 'Phase Out | Fitso.me'
   }, [])
 
-  const loadItems = async () => {
-    const data = await db.items.toArray()
-    setItems(data)
-    setLoading(false)
-  }
-
   const handleTogglePhaseOut = async (item: Item) => {
-    await db.items.update(item.id, { isPhaseOut: !item.isPhaseOut, updatedAt: new Date().toISOString() })
-    loadItems()
+    try {
+      await updateItem(item.id, { isPhaseOut: !item.isPhaseOut })
+      toast.success(item.isPhaseOut ? 'Removed from phase out list' : 'Added to phase out list')
+    } catch (error) {
+      console.error('Error updating item:', error)
+      toast.error('Failed to update item')
+    }
   }
 
   const handleDelete = async () => {
-    if (!deleteItem) return
-    await db.items.delete(deleteItem.id)
-    loadItems()
-    setDeleteItem(null)
+    if (!deleteItemState) return
+    try {
+      await deleteItemFromStore(deleteItemState.id)
+      toast.success('Item deleted')
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      toast.error('Failed to delete item')
+    }
+    setDeleteItemState(null)
   }
 
   const phaseOutItems = items.filter((item) => item.isPhaseOut)
@@ -68,8 +71,8 @@ export default function PhaseOut() {
 
     return (
       <div key={item.id} className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border hover:bg-secondary/50 transition-colors group">
-        {item.imageData ? (
-          <img src={item.imageData} alt={item.name} className="h-10 w-10 md:h-12 md:w-12 rounded-xl object-cover shrink-0" />
+        {(item.imageData || item.imageRef) ? (
+          <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-10 w-10 md:h-12 md:w-12 rounded-xl object-cover shrink-0" />
         ) : (
           <div className={cn('h-10 w-10 md:h-12 md:w-12 rounded-xl bg-gradient-to-br flex items-center justify-center shrink-0', categoryColors[item.category] || 'from-gray-400 to-gray-500')}>
             <Icon className="h-5 w-5 md:h-6 md:w-6 text-white" />
@@ -105,7 +108,7 @@ export default function PhaseOut() {
             </Button>
           )}
 
-          <Button variant="ghost" size="icon" onClick={() => setDeleteItem(item)} className="h-8 w-8 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-destructive">
+          <Button variant="ghost" size="icon" onClick={() => setDeleteItemState(item)} className="h-8 w-8 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-destructive">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -233,12 +236,12 @@ export default function PhaseOut() {
         </Card>
       )}
 
-      <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
+      <AlertDialog open={!!deleteItemState} onOpenChange={() => setDeleteItemState(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Item</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to permanently delete "{deleteItem?.name}"? This action cannot be undone.
+              Are you sure you want to permanently delete "{deleteItemState?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

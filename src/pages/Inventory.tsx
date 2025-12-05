@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { db, generateId, type Item } from '@/db'
+import { type Item } from '@/db'
+import { useItems } from '@/hooks/useItems'
+import { getImageUrl } from '@/lib/imageUrl'
 import {
   CATEGORIES,
   CLIMATES,
@@ -35,6 +37,7 @@ import {
   Grid3X3,
   Laptop,
   List,
+  Loader2,
   Package,
   Pencil,
   Plus,
@@ -46,6 +49,7 @@ import {
   Watch
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 const categoryIcons: Record<string, typeof Package> = {
   clothing: Shirt,
@@ -243,8 +247,8 @@ function SizeInput({
 }
 
 export default function Inventory() {
-  const [items, setItems] = useState<Item[]>([])
-  const [loading, setLoading] = useState(true)
+  // Use the unified items hook that handles both Supabase and local storage
+  const { items, isLoading: loading, addItem: addItemToStore, updateItem: updateItemInStore, deleteItem: deleteItemFromStore } = useItems()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [subcategoryFilter, setSubcategoryFilter] = useState<string>('all')
@@ -293,9 +297,12 @@ export default function Inventory() {
     occasion: '',
     isPhaseOut: false,
     isFeatured: false,
-    imageData: undefined as string | undefined,
+    imageData: undefined as string | undefined, // New image data (base64)
+    imageRef: undefined as string | undefined, // Existing image reference (R2 path)
     size: undefined as SizeInfo | undefined,
   })
+
+  const [isSaving, setIsSaving] = useState(false)
 
   const [formData, setFormData] = useState(getInitialFormData())
 
@@ -306,10 +313,6 @@ export default function Inventory() {
 
   // Track previous category/subcategory to detect actual changes
   const [prevCategory, setPrevCategory] = useState({ category: '', subcategory: '' })
-
-  useEffect(() => {
-    loadItems()
-  }, [])
 
   // Reset size only when category/subcategory actually changes (not on initial load from edit)
   useEffect(() => {
@@ -322,41 +325,45 @@ export default function Inventory() {
     setPrevCategory({ category: formData.category, subcategory: formData.subcategory })
   }, [formData.category, formData.subcategory])
 
-  const loadItems = async () => {
-    const data = await db.items.toArray()
-    setItems(data)
-    setLoading(false)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const now = new Date().toISOString()
+    setIsSaving(true)
 
-    if (editingItem) {
-      const updated: Item = {
-        ...editingItem,
-        ...formData,
-        updatedAt: now,
+    try {
+      if (editingItem) {
+        // Update existing item
+        await updateItemInStore(editingItem.id, {
+          ...formData,
+          // Only include imageRef if we don't have new imageData
+          imageRef: formData.imageData ? undefined : formData.imageRef,
+        })
+        toast.success('Item updated successfully')
+      } else {
+        // Create new item
+        await addItemToStore({
+          ...formData,
+        })
+        toast.success('Item added successfully')
       }
-      await db.items.put(updated)
-    } else {
-      const newItem: Item = {
-        id: generateId(),
-        ...formData,
-        createdAt: now,
-        updatedAt: now,
-      }
-      await db.items.add(newItem)
+
+      handleCloseDialog()
+    } catch (error) {
+      console.error('Error saving item:', error)
+      toast.error(editingItem ? 'Failed to update item' : 'Failed to add item')
+    } finally {
+      setIsSaving(false)
     }
-
-    loadItems()
-    handleCloseDialog()
   }
 
   const handleDelete = async () => {
     if (!deleteItem) return
-    await db.items.delete(deleteItem.id)
-    loadItems()
+    try {
+      await deleteItemFromStore(deleteItem.id)
+      toast.success('Item deleted')
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      toast.error('Failed to delete item')
+    }
     setDeleteItem(null)
   }
 
@@ -365,6 +372,7 @@ export default function Inventory() {
     setEditingItem(null)
     setPrevCategory({ category: '', subcategory: '' })
     setFormData(getInitialFormData())
+    setIsSaving(false)
   }
 
   const handleEdit = (item: Item) => {
@@ -385,7 +393,8 @@ export default function Inventory() {
       occasion: item.occasion || '',
       isPhaseOut: item.isPhaseOut || false,
       isFeatured: item.isFeatured || false,
-      imageData: item.imageData,
+      imageData: undefined, // Clear any previous base64 data
+      imageRef: item.imageRef, // Keep existing image reference
       size: item.size,
     })
     setIsAddDialogOpen(true)
@@ -410,7 +419,8 @@ export default function Inventory() {
       occasion: item.occasion || '',
       isPhaseOut: false, // New items shouldn't be phased out
       isFeatured: false, // New items aren't featured by default
-      imageData: item.imageData, // Keep the image
+      imageData: undefined, // Don't copy image for duplicates
+      imageRef: item.imageRef, // But keep the reference if it exists
       size: item.size, // Keep the size
     })
     setIsAddDialogOpen(true)
@@ -418,9 +428,7 @@ export default function Inventory() {
 
   const toggleFeatured = async (item: Item, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updated = { ...item, isFeatured: !item.isFeatured, updatedAt: new Date().toISOString() }
-    await db.items.put(updated)
-    loadItems()
+    await updateItemInStore(item.id, { isFeatured: !item.isFeatured })
   }
 
   const filteredItems = items.filter((item) => {
@@ -543,9 +551,9 @@ export default function Inventory() {
               )}>
                 {/* Image or placeholder with action buttons overlay */}
                 <div className="relative">
-                  {item.imageData ? (
+                  {(item.imageData || item.imageRef) ? (
                     <div className="aspect-square overflow-hidden">
-                      <img src={item.imageData} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className={cn(
@@ -653,8 +661,8 @@ export default function Inventory() {
                 )}
               >
                 <div className="relative shrink-0">
-                  {item.imageData ? (
-                    <img src={item.imageData} alt={item.name} className="h-12 w-12 rounded-lg object-cover" />
+                  {(item.imageData || item.imageRef) ? (
+                    <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-12 w-12 rounded-lg object-cover" />
                   ) : (
                     <div className={cn(
                       "h-12 w-12 rounded-lg bg-gradient-to-br flex items-center justify-center",
@@ -732,8 +740,8 @@ export default function Inventory() {
             <div>
               <Label>Photo</Label>
               <ImageUpload
-                value={formData.imageData}
-                onChange={(value) => setFormData({ ...formData, imageData: value })}
+                value={formData.imageData || (formData.imageRef ? (getImageUrl(formData.imageRef) ?? undefined) : undefined)}
+                onChange={(value) => setFormData({ ...formData, imageData: value, imageRef: value ? undefined : formData.imageRef })}
                 className="mt-2"
               />
             </div>
@@ -930,8 +938,17 @@ export default function Inventory() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-              <Button type="submit">{editingItem ? 'Save Changes' : 'Add Item'}</Button>
+              <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {editingItem ? 'Saving...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingItem ? 'Save Changes' : 'Add Item'
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

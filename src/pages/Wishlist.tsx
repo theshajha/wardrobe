@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { db, generateId, type WishlistItem } from '@/db'
+import { type WishlistItem } from '@/db'
+import { useWishlist } from '@/hooks/useWishlist'
 import { CATEGORIES, CURRENCIES, cn, formatCurrency } from '@/lib/utils'
 import { getDefaultCurrency } from '@/pages/Settings'
 import {
@@ -16,6 +17,7 @@ import {
   Footprints,
   Laptop,
   Link2,
+  Loader2,
   Package,
   Pencil,
   Plus,
@@ -25,7 +27,8 @@ import {
   Watch,
   X
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 const priorityColors = {
   low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
@@ -56,8 +59,15 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function Wishlist() {
-  const [items, setItems] = useState<WishlistItem[]>([])
-  const [loading, setLoading] = useState(true)
+  // Use unified wishlist hook for Supabase/local storage
+  const {
+    wishlist: rawItems,
+    isLoading: loading,
+    addWishlistItem,
+    updateWishlistItem,
+    deleteWishlistItem
+  } = useWishlist()
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null)
   const [showPurchased, setShowPurchased] = useState(false)
@@ -74,19 +84,15 @@ export default function Wishlist() {
   })
 
   const [formData, setFormData] = useState(getInitialFormData())
-
-  useEffect(() => {
-    loadItems()
-  }, [])
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     document.title = 'Wishlist | Fitso.me'
   }, [])
 
-  const loadItems = async () => {
-    const data = await db.wishlist.toArray()
-    // Sort: unpurchased first, then by priority (high > medium > low), then by date
-    const sorted = data.sort((a, b) => {
+  // Sort items: unpurchased first, then by priority (high > medium > low), then by date
+  const items = useMemo(() => {
+    return [...rawItems].sort((a, b) => {
       if (a.isPurchased !== b.isPurchased) return a.isPurchased ? 1 : -1
       const priorityOrder = { high: 0, medium: 1, low: 2 }
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -94,40 +100,37 @@ export default function Wishlist() {
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
-    setItems(sorted)
-    setLoading(false)
-  }
+  }, [rawItems])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const now = new Date().toISOString()
+    setIsSaving(true)
 
-    if (editingItem) {
-      const updated: WishlistItem = {
-        ...editingItem,
-        ...formData,
-        updatedAt: now,
+    try {
+      if (editingItem) {
+        await updateWishlistItem(editingItem.id, formData)
+        toast.success('Wishlist item updated')
+      } else {
+        await addWishlistItem({
+          ...formData,
+          isPurchased: false,
+        })
+        toast.success('Item added to wishlist')
       }
-      await db.wishlist.put(updated)
-    } else {
-      const newItem: WishlistItem = {
-        id: generateId(),
-        ...formData,
-        isPurchased: false,
-        createdAt: now,
-        updatedAt: now,
-      }
-      await db.wishlist.add(newItem)
+      handleCloseDialog()
+    } catch (error) {
+      console.error('Error saving wishlist item:', error)
+      toast.error('Failed to save item')
+    } finally {
+      setIsSaving(false)
     }
-
-    loadItems()
-    handleCloseDialog()
   }
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false)
     setEditingItem(null)
     setFormData(getInitialFormData())
+    setIsSaving(false)
   }
 
   const handleEdit = (item: WishlistItem) => {
@@ -146,19 +149,26 @@ export default function Wishlist() {
   }
 
   const handleDelete = async (item: WishlistItem) => {
-    await db.wishlist.delete(item.id)
-    loadItems()
+    try {
+      await deleteWishlistItem(item.id)
+      toast.success('Item removed from wishlist')
+    } catch (error) {
+      console.error('Error deleting wishlist item:', error)
+      toast.error('Failed to remove item')
+    }
   }
 
   const handleTogglePurchased = async (item: WishlistItem) => {
-    const updated: WishlistItem = {
-      ...item,
-      isPurchased: !item.isPurchased,
-      purchasedAt: !item.isPurchased ? new Date().toISOString() : undefined,
-      updatedAt: new Date().toISOString(),
+    try {
+      await updateWishlistItem(item.id, {
+        isPurchased: !item.isPurchased,
+        purchasedAt: !item.isPurchased ? new Date().toISOString() : undefined,
+      })
+      toast.success(item.isPurchased ? 'Marked as not purchased' : 'Marked as purchased')
+    } catch (error) {
+      console.error('Error toggling purchased status:', error)
+      toast.error('Failed to update item')
     }
-    await db.wishlist.put(updated)
-    loadItems()
   }
 
   const unpurchasedItems = items.filter(i => !i.isPurchased)
@@ -540,11 +550,18 @@ export default function Wishlist() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+              <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {editingItem ? 'Save' : 'Add to List'}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {editingItem ? 'Saving...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingItem ? 'Save' : 'Add to List'
+                )}
               </Button>
             </DialogFooter>
           </form>

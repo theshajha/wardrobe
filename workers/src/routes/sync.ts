@@ -39,6 +39,55 @@ export const syncRouter = new Hono<{
 }>();
 
 /**
+ * POST /sync/repair-image-refs
+ * Automatically repair missing imageRef values from imageHash
+ * This runs server-side and fixes the data for the authenticated user
+ */
+syncRouter.post('/repair-image-refs', async (c) => {
+  try {
+    const session = c.get('session');
+
+    // Load current items from server
+    const items = await loadTableData<SyncItem>(c.env.R2_BUCKET, session.username, 'items');
+
+    let repaired = 0;
+
+    // Repair items that have imageHash but no imageRef
+    for (const item of items) {
+      if (item.imageHash && !item.imageRef) {
+        item.imageRef = `${session.username}/images/${item.imageHash}`;
+        item.imageSyncStatus = 'synced' as any;
+        repaired++;
+      }
+    }
+
+    if (repaired > 0) {
+      // Save repaired items back to server
+      await saveTableData(c.env.R2_BUCKET, session.username, 'items', items);
+
+      // Increment version so clients pull fresh data
+      const metadata = await loadMetadata(c.env.R2_BUCKET, session.username);
+      metadata.version += 1;
+      metadata.updatedAt = new Date().toISOString();
+      await saveMetadata(c.env.R2_BUCKET, session.username, metadata, session);
+
+      console.log(`[Repair] Fixed ${repaired} items for user ${session.username}`);
+    }
+
+    return c.json({
+      success: true,
+      repaired,
+      message: repaired > 0
+        ? `Repaired ${repaired} items. Please sync to download images.`
+        : 'No repairs needed - all items have imageRef values.'
+    });
+  } catch (error) {
+    console.error('[Repair] Error:', error);
+    return c.json({ success: false, error: 'Repair failed' }, 500);
+  }
+});
+
+/**
  * GET /sync
  * Pull changes from server since a given version
  */
@@ -65,6 +114,29 @@ syncRouter.get('/', async (c) => {
         } as SyncPullResponse,
         429
       );
+    }
+
+    // AUTO-REPAIR: Fix any items with imageHash but no imageRef
+    // This runs once per sync to automatically fix legacy data
+    try {
+      const items = await loadTableData<SyncItem>(c.env.R2_BUCKET, session.username, 'items');
+      let needsRepair = false;
+
+      for (const item of items) {
+        if (item.imageHash && !item.imageRef) {
+          item.imageRef = `${session.username}/images/${item.imageHash}`;
+          item.imageSyncStatus = 'synced' as any;
+          needsRepair = true;
+        }
+      }
+
+      if (needsRepair) {
+        await saveTableData(c.env.R2_BUCKET, session.username, 'items', items);
+        console.log(`[Auto-Repair] Fixed imageRef for user ${session.username}`);
+      }
+    } catch (repairError) {
+      // Don't fail the sync if auto-repair fails
+      console.error('[Auto-Repair] Failed:', repairError);
     }
 
     // Load metadata

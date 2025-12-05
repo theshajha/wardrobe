@@ -10,6 +10,7 @@ import { authRouter } from './routes/auth';
 import { syncRouter } from './routes/sync';
 import { imagesRouter } from './routes/images';
 import { publicRouter } from './routes/public';
+import { migrationRouter } from './routes/migration';
 import { verifySession } from './utils/auth';
 
 // Create Hono app with Env type
@@ -41,6 +42,9 @@ app.get('/', (c) => {
 // Public routes - auth and showcase
 app.route('/auth', authRouter);
 app.route('/public', publicRouter);
+
+// Migration routes (protected by secret key, not session)
+app.route('/migration', migrationRouter);
 
 // Protected routes middleware
 app.use('/sync/*', async (c, next) => {

@@ -32,14 +32,17 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@supabase/supabase-js": "^2.86.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dexie": "^4.0.8",
+    "dexie-react-hooks": "^4.2.0",
     "lucide-react": "^0.555.0",
     "posthog-js": "^1.301.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

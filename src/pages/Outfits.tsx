@@ -8,10 +8,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { db, generateId, type Item, type Outfit } from '@/db'
+import type { Outfit } from '@/db'
+import { useItems } from '@/hooks/useItems'
+import { useOutfits } from '@/hooks/useOutfits'
+import { getImageUrl } from '@/lib/imageUrl'
 import { cn, OCCASIONS } from '@/lib/utils'
-import { Briefcase, Footprints, Laptop, Package, Plus, Shirt, Sparkles, Trash2, Watch } from 'lucide-react'
+import { Briefcase, Footprints, Laptop, Loader2, Package, Plus, Shirt, Sparkles, Trash2, Watch } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 const categoryIcons: Record<string, typeof Package> = {
   clothing: Shirt,
@@ -22,59 +26,62 @@ const categoryIcons: Record<string, typeof Package> = {
 }
 
 export default function Outfits() {
-  const [items, setItems] = useState<Item[]>([])
-  const [outfits, setOutfits] = useState<Outfit[]>([])
-  const [loading, setLoading] = useState(true)
+  // Use unified hooks for Supabase/local storage
+  const { items, isLoading: itemsLoading } = useItems()
+  const { outfits, isLoading: outfitsLoading, addOutfit, deleteOutfit: deleteOutfitFromStore } = useOutfits()
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [deleteOutfit, setDeleteOutfit] = useState<Outfit | null>(null)
+  const [deleteOutfitState, setDeleteOutfitState] = useState<Outfit | null>(null)
 
   const [outfitForm, setOutfitForm] = useState({
     name: '',
     occasion: '',
     selectedItems: [] as string[],
   })
+  const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const loading = itemsLoading || outfitsLoading
 
   useEffect(() => {
     document.title = 'Outfits | Fitso.me'
   }, [])
 
-  const loadData = async () => {
-    const [itemsData, outfitsData] = await Promise.all([db.items.toArray(), db.outfits.toArray()])
-    setItems(itemsData)
-    setOutfits(outfitsData)
-    setLoading(false)
-  }
-
   const handleCreateOutfit = async () => {
     if (!outfitForm.name || outfitForm.selectedItems.length === 0) return
+    setIsSaving(true)
 
-    const newOutfit: Outfit = {
-      id: generateId(),
-      name: outfitForm.name,
-      occasion: outfitForm.occasion || undefined,
-      itemIds: outfitForm.selectedItems,
-      createdAt: new Date().toISOString(),
+    try {
+      await addOutfit({
+        name: outfitForm.name,
+        occasion: outfitForm.occasion || undefined,
+        itemIds: outfitForm.selectedItems,
+      })
+      toast.success('Outfit created')
+      handleCloseDialog()
+    } catch (error) {
+      console.error('Error creating outfit:', error)
+      toast.error('Failed to create outfit')
+    } finally {
+      setIsSaving(false)
     }
-
-    await db.outfits.add(newOutfit)
-    loadData()
-    handleCloseDialog()
   }
 
   const handleDeleteOutfit = async () => {
-    if (!deleteOutfit) return
-    await db.outfits.delete(deleteOutfit.id)
-    loadData()
-    setDeleteOutfit(null)
+    if (!deleteOutfitState) return
+    try {
+      await deleteOutfitFromStore(deleteOutfitState.id)
+      toast.success('Outfit deleted')
+    } catch (error) {
+      console.error('Error deleting outfit:', error)
+      toast.error('Failed to delete outfit')
+    }
+    setDeleteOutfitState(null)
   }
 
   const handleCloseDialog = () => {
     setIsCreateDialogOpen(false)
     setOutfitForm({ name: '', occasion: '', selectedItems: [] })
+    setIsSaving(false)
   }
 
   const toggleItemSelection = (itemId: string) => {
@@ -200,8 +207,8 @@ export default function Outfits() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {outfits.map((outfit) => {
             const outfitItems = items.filter((i) => outfit.itemIds.includes(i.id))
-            const itemsWithImages = outfitItems.filter(i => i.imageData)
-            const itemsWithoutImages = outfitItems.filter(i => !i.imageData)
+            const itemsWithImages = outfitItems.filter(i => i.imageData || i.imageRef)
+            const itemsWithoutImages = outfitItems.filter(i => !i.imageData && !i.imageRef)
 
             return (
               <Card key={outfit.id} className="card-hover group overflow-hidden">
@@ -228,7 +235,7 @@ export default function Outfits() {
                           )}
                         >
                           <img
-                            src={item.imageData}
+                            src={item.imageData || getImageUrl(item.imageRef) || ''}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -256,7 +263,7 @@ export default function Outfits() {
                     variant="ghost"
                     size="icon"
                     className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => setDeleteOutfit(outfit)}
+                    onClick={() => setDeleteOutfitState(outfit)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -363,7 +370,7 @@ export default function Outfits() {
                             )}
                           >
                             <Checkbox checked={outfitForm.selectedItems.includes(item.id)} onCheckedChange={() => toggleItemSelection(item.id)} />
-                            {item.imageData && <img src={item.imageData} alt={item.name} className="h-8 w-8 rounded object-cover" />}
+                            {(item.imageData || item.imageRef) && <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-8 w-8 rounded object-cover" />}
                             <div className="flex-1">
                               <p className="font-medium text-sm">{item.name}</p>
                               <p className="text-xs text-muted-foreground">{item.subcategory}{item.color && ` • ${item.color}`}</p>
@@ -386,7 +393,7 @@ export default function Outfits() {
                             )}
                           >
                             <Checkbox checked={outfitForm.selectedItems.includes(item.id)} onCheckedChange={() => toggleItemSelection(item.id)} />
-                            {item.imageData && <img src={item.imageData} alt={item.name} className="h-8 w-8 rounded object-cover" />}
+                            {(item.imageData || item.imageRef) && <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-8 w-8 rounded object-cover" />}
                             <div className="flex-1">
                               <p className="font-medium text-sm">{item.name}</p>
                               <p className="text-xs text-muted-foreground">{item.subcategory}{item.color && ` • ${item.color}`}</p>
@@ -409,7 +416,7 @@ export default function Outfits() {
                             )}
                           >
                             <Checkbox checked={outfitForm.selectedItems.includes(item.id)} onCheckedChange={() => toggleItemSelection(item.id)} />
-                            {item.imageData && <img src={item.imageData} alt={item.name} className="h-8 w-8 rounded object-cover" />}
+                            {(item.imageData || item.imageRef) && <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-8 w-8 rounded object-cover" />}
                             <div className="flex-1">
                               <p className="font-medium text-sm">{item.name}</p>
                               <p className="text-xs text-muted-foreground">{item.subcategory}{item.color && ` • ${item.color}`}</p>
@@ -425,21 +432,28 @@ export default function Outfits() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-            <Button onClick={handleCreateOutfit} disabled={!outfitForm.name || outfitForm.selectedItems.length === 0}>
-              Create Outfit
+            <Button variant="outline" onClick={handleCloseDialog} disabled={isSaving}>Cancel</Button>
+            <Button onClick={handleCreateOutfit} disabled={isSaving || !outfitForm.name || outfitForm.selectedItems.length === 0}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Outfit'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteOutfit} onOpenChange={() => setDeleteOutfit(null)}>
+      <AlertDialog open={!!deleteOutfitState} onOpenChange={() => setDeleteOutfitState(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Outfit</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteOutfit?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{deleteOutfitState?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

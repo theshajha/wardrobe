@@ -1,34 +1,39 @@
-import { useState, useEffect } from 'react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import type { Trip, TripItem } from '@/db'
+import { useItems } from '@/hooks/useItems'
+import { useTripItems, useTrips } from '@/hooks/useTrips'
+import { getImageUrl } from '@/lib/imageUrl'
+import { CLIMATES, cn, formatDate } from '@/lib/utils'
 import {
-  Plane,
-  Plus,
-  MapPin,
-  Calendar,
-  Cloud,
   Briefcase,
-  Package,
-  Shirt,
-  Watch,
-  Laptop,
-  Footprints,
-  Pencil,
-  Trash2,
+  Calendar,
   CheckCircle2,
   Circle,
+  Cloud,
+  Footprints,
+  Laptop,
+  Loader2,
+  MapPin,
+  Package,
+  Pencil,
+  Plane,
+  Plus,
+  Shirt,
+  Trash2,
+  Watch,
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { db, generateId, type Item, type Trip, type TripItem } from '@/db'
-import { cn, formatDate, CLIMATES } from '@/lib/utils'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 const categoryIcons: Record<string, typeof Package> = {
   clothing: Shirt,
@@ -50,14 +55,18 @@ interface TripWithItems extends Trip {
 }
 
 export default function Packing() {
-  const [trips, setTrips] = useState<TripWithItems[]>([])
-  const [items, setItems] = useState<Item[]>([])
-  const [selectedTrip, setSelectedTrip] = useState<TripWithItems | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Use unified hooks for Supabase/local storage
+  const { trips: rawTrips, isLoading: tripsLoading, addTrip, updateTrip, deleteTrip: deleteTripFromStore } = useTrips()
+  const { items, isLoading: itemsLoading } = useItems()
+
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
   const [isTripDialogOpen, setIsTripDialogOpen] = useState(false)
   const [isAddItemsDialogOpen, setIsAddItemsDialogOpen] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
-  const [deleteTrip, setDeleteTrip] = useState<Trip | null>(null)
+  const [deleteTripState, setDeleteTripState] = useState<Trip | null>(null)
+
+  // Get trip items for the selected trip
+  const { tripItems: selectedTripItems, addTripItem, updateTripItem, removeTripItem } = useTripItems(selectedTripId || undefined)
 
   const [tripForm, setTripForm] = useState({
     name: '',
@@ -68,72 +77,69 @@ export default function Packing() {
     notes: '',
     status: 'planning',
   })
-
-  useEffect(() => {
-    loadData()
-  }, [])
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     document.title = 'Packing | Fitso.me'
   }, [])
 
-  const loadData = async () => {
-    const [tripsData, tripItemsData, itemsData] = await Promise.all([
-      db.trips.toArray(),
-      db.tripItems.toArray(),
-      db.items.toArray(),
-    ])
-
-    const tripsWithItems = tripsData.map((trip) => ({
+  // Compute trips with their items
+  const trips = useMemo(() => {
+    return rawTrips.map((trip) => ({
       ...trip,
-      tripItems: tripItemsData.filter((ti) => ti.tripId === trip.id),
+      tripItems: trip.id === selectedTripId ? selectedTripItems : [],
     }))
+  }, [rawTrips, selectedTripId, selectedTripItems])
 
-    setTrips(tripsWithItems)
-    setItems(itemsData)
-    setLoading(false)
+  // Get selected trip with items
+  const selectedTrip = useMemo(() => {
+    if (!selectedTripId) return null
+    const trip = rawTrips.find(t => t.id === selectedTripId)
+    if (!trip) return null
+    return { ...trip, tripItems: selectedTripItems }
+  }, [rawTrips, selectedTripId, selectedTripItems])
 
-    // Update selected trip if it exists
-    if (selectedTrip) {
-      const updated = tripsWithItems.find((t) => t.id === selectedTrip.id)
-      if (updated) setSelectedTrip(updated)
-    }
-  }
+  const loading = tripsLoading || itemsLoading
 
   const handleTripSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const now = new Date().toISOString()
+    setIsSaving(true)
 
-    if (editingTrip) {
-      const updated: Trip = { ...editingTrip, ...tripForm, updatedAt: now }
-      await db.trips.put(updated)
-    } else {
-      const newTrip: Trip = {
-        id: generateId(),
-        ...tripForm,
-        createdAt: now,
-        updatedAt: now,
+    try {
+      if (editingTrip) {
+        await updateTrip(editingTrip.id, tripForm)
+        toast.success('Trip updated')
+      } else {
+        await addTrip(tripForm)
+        toast.success('Trip created')
       }
-      await db.trips.add(newTrip)
+      handleCloseTripDialog()
+    } catch (error) {
+      console.error('Error saving trip:', error)
+      toast.error('Failed to save trip')
+    } finally {
+      setIsSaving(false)
     }
-
-    loadData()
-    handleCloseTripDialog()
   }
 
   const handleDeleteTrip = async () => {
-    if (!deleteTrip) return
-    await db.tripItems.where('tripId').equals(deleteTrip.id).delete()
-    await db.trips.delete(deleteTrip.id)
-    if (selectedTrip?.id === deleteTrip.id) setSelectedTrip(null)
-    loadData()
-    setDeleteTrip(null)
+    if (!deleteTripState) return
+    try {
+      await deleteTripFromStore(deleteTripState.id)
+      if (selectedTripId === deleteTripState.id) setSelectedTripId(null)
+      toast.success('Trip deleted')
+    } catch (error) {
+      console.error('Error deleting trip:', error)
+      toast.error('Failed to delete trip')
+    }
+    setDeleteTripState(null)
   }
 
   const handleCloseTripDialog = () => {
     setIsTripDialogOpen(false)
     setEditingTrip(null)
     setTripForm({ name: '', destination: '', startDate: '', endDate: '', climate: '', notes: '', status: 'planning' })
+    setIsSaving(false)
   }
 
   const handleEditTrip = (trip: Trip) => {
@@ -151,26 +157,21 @@ export default function Packing() {
   }
 
   const handleAddItemToTrip = async (itemId: string) => {
-    if (!selectedTrip) return
-    const newTripItem: TripItem = {
-      id: generateId(),
-      tripId: selectedTrip.id,
+    if (!selectedTripId) return
+    await addTripItem({
+      tripId: selectedTripId,
       itemId,
       packed: false,
       quantity: 1,
-    }
-    await db.tripItems.add(newTripItem)
-    loadData()
+    })
   }
 
   const handleRemoveItemFromTrip = async (tripItemId: string) => {
-    await db.tripItems.delete(tripItemId)
-    loadData()
+    await removeTripItem(tripItemId)
   }
 
   const handleTogglePacked = async (tripItem: TripItem) => {
-    await db.tripItems.update(tripItem.id, { packed: !tripItem.packed })
-    loadData()
+    await updateTripItem(tripItem.id, { packed: !tripItem.packed })
   }
 
   const getPackingProgress = (trip: TripWithItems) => {
@@ -179,7 +180,7 @@ export default function Packing() {
     return Math.round((packed / trip.tripItems.length) * 100)
   }
 
-  const tripItemIds = selectedTrip?.tripItems.map((ti) => ti.itemId) || []
+  const tripItemIds = selectedTripItems.map((ti) => ti.itemId) || []
   const availableItems = items.filter((item) => !tripItemIds.includes(item.id))
 
   // Mobile: show trip list or trip detail based on selection
@@ -187,7 +188,7 @@ export default function Packing() {
 
   // On mobile, when a trip is selected, show the detail view
   const handleSelectTrip = (trip: TripWithItems) => {
-    setSelectedTrip(trip)
+    setSelectedTripId(trip.id)
     setShowTripList(false)
   }
 
@@ -378,8 +379,8 @@ export default function Packing() {
                         )}
                       </button>
 
-                      {item.imageData ? (
-                        <img src={item.imageData} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
+                      {(item.imageData || item.imageRef) ? (
+                        <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
                       ) : (
                         <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
                           <Icon className="h-5 w-5 text-muted-foreground" />
@@ -507,8 +508,17 @@ export default function Packing() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseTripDialog}>Cancel</Button>
-              <Button type="submit">{editingTrip ? 'Save Changes' : 'Create Trip'}</Button>
+              <Button type="button" variant="outline" onClick={handleCloseTripDialog} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {editingTrip ? 'Saving...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingTrip ? 'Save Changes' : 'Create Trip'
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -535,8 +545,8 @@ export default function Packing() {
 
                   return (
                     <div key={item.id} className="flex items-center gap-4 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                      {item.imageData ? (
-                        <img src={item.imageData} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
+                      {(item.imageData || item.imageRef) ? (
+                        <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
                       ) : (
                         <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
                           <Icon className="h-5 w-5 text-muted-foreground" />
@@ -567,12 +577,12 @@ export default function Packing() {
       </Dialog>
 
       {/* Delete Trip Confirmation */}
-      <AlertDialog open={!!deleteTrip} onOpenChange={() => setDeleteTrip(null)}>
+      <AlertDialog open={!!deleteTripState} onOpenChange={() => setDeleteTripState(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Trip</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteTrip?.name}"? This will also remove all packed items from this trip.
+              Are you sure you want to delete "{deleteTripState?.name}"? This will also remove all packed items from this trip.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Menu, Package, Plane, Settings, Shirt, ShoppingBag, Sparkles, Trash2, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { LayoutDashboard, LogOut, Menu, Package, Plane, Settings, Shirt, ShoppingBag, Sparkles, Trash2, X, User } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 // Navigation grouped by workflow
 const navGroups = [
@@ -62,6 +63,17 @@ function FitSomeLogo({ compact = false }: { compact?: boolean }) {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user, username, signOut } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await signOut();
+    setIsLoggingOut(false);
+    onNavigate?.();
+    navigate('/');
+  };
 
   return (
     <>
@@ -119,8 +131,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="h-px bg-border shrink-0" />
 
-      {/* Settings - Always at bottom */}
-      <div className="p-3 md:p-4 shrink-0">
+      {/* Settings & Account - At bottom */}
+      <div className="p-3 md:p-4 shrink-0 space-y-2">
         <Link
           to="/settings"
           onClick={onNavigate}
@@ -134,6 +146,27 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Settings className={cn('h-4 w-4', location.pathname === '/settings' && 'text-pink-400')} />
           Settings
         </Link>
+
+        {/* User Account Section - Only for authenticated users */}
+        {isAuthenticated && user && (
+          <>
+            <div className="h-px bg-border/50" />
+            <div className="px-3 py-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <User className="h-3 w-3" />
+                <span className="truncate">{username ? `@${username}` : user.email}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                <LogOut className="h-3 w-3" />
+                {isLoggingOut ? 'Signing out...' : 'Sign out'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

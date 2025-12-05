@@ -1,7 +1,11 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { db, type Item, type Trip } from '@/db'
+import { useAuth } from '@/contexts/AuthContext'
+// Item and Trip types are inferred from hooks
+import { useItems } from '@/hooks/useItems'
+import { useTrips } from '@/hooks/useTrips'
+import { getImageUrl } from '@/lib/imageUrl'
 import { formatCurrency, formatDate, getItemAge } from '@/lib/utils'
 import {
   AlertTriangle,
@@ -16,9 +20,8 @@ import {
   TrendingUp,
   Watch,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getUserName } from './Landing'
 
 const categoryIcons: Record<string, typeof Package> = {
   clothing: Shirt,
@@ -37,24 +40,12 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function Dashboard() {
-  const [items, setItems] = useState<Item[]>([])
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [loading, setLoading] = useState(true)
-  const [userName, setUserName] = useState<string | null>(null)
+  // Use unified hooks for Supabase
+  const { items, isLoading: itemsLoading } = useItems()
+  const { trips, isLoading: tripsLoading } = useTrips()
+  const { username } = useAuth()
 
-  useEffect(() => {
-    const loadData = async () => {
-      const [itemsData, tripsData] = await Promise.all([
-        db.items.toArray(),
-        db.trips.toArray(),
-      ])
-      setItems(itemsData)
-      setTrips(tripsData)
-      setUserName(getUserName())
-      setLoading(false)
-    }
-    loadData()
-  }, [])
+  const loading = itemsLoading || tripsLoading
 
   useEffect(() => {
     document.title = 'Dashboard | Fitso.me'
@@ -117,7 +108,7 @@ export default function Dashboard() {
     })
     .slice(0, 5)
 
-  const greeting = userName ? `Welcome back, ${userName}` : 'Welcome back'
+  const greeting = username ? `Welcome back, ${username}` : 'Welcome back'
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in">
@@ -252,8 +243,8 @@ export default function Dashboard() {
                   const Icon = categoryIcons[item.category] || Package
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-colors">
-                      {item.imageData ? (
-                        <img src={item.imageData} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
+                      {(item.imageData || item.imageRef) ? (
+                        <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
                       ) : (
                         <div className={`h-10 w-10 rounded-lg bg-gradient-to-br ${categoryColors[item.category] || 'from-gray-400 to-gray-500'} flex items-center justify-center`}>
                           <Icon className="h-5 w-5 text-white" />
@@ -326,8 +317,8 @@ export default function Dashboard() {
                   const Icon = categoryIcons[item.category] || Package
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-colors">
-                      {item.imageData ? (
-                        <img src={item.imageData} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
+                      {(item.imageData || item.imageRef) ? (
+                        <img src={item.imageData || getImageUrl(item.imageRef) || ''} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
                       ) : (
                         <div className={`h-10 w-10 rounded-lg bg-gradient-to-br ${categoryColors[item.category] || 'from-gray-400 to-gray-500'} flex items-center justify-center`}>
                           <Icon className="h-5 w-5 text-white" />

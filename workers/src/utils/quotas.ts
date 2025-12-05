@@ -32,7 +32,7 @@ export const DEFAULT_QUOTAS: UserQuotas = {
   // Storage limits
   maxImageSizeBytes: 1 * 1024 * 1024,        // 1MB
   maxTotalStorageBytes: 100 * 1024 * 1024,   // 100MB
-  maxImageDimensions: 2000,                   // 4000x4000px
+  maxImageDimensions: 2000,                   // 2000x2000px
 
   // Item limits
   maxTotalItems: 1000,

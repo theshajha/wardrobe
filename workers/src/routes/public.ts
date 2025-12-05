@@ -24,7 +24,7 @@ publicRouter.get('/showcase/:username', async (c) => {
 
     // Look up user by username
     const userInfo = await getUserByUsername(username, c.env);
-    
+
     if (!userInfo) {
       return c.json({ success: false, error: 'User not found' }, 404);
     }
@@ -97,6 +97,40 @@ publicRouter.get('/showcase/:username/image/:hash', async (c) => {
 });
 
 /**
+ * GET /public/images/:path
+ * Serve images publicly (for authenticated users viewing in-app)
+ * The path should be: {username}/images/{hash}
+ */
+publicRouter.get('/images/:path{.+}', async (c) => {
+  try {
+    const path = c.req.param('path');
+
+    if (!path || !path.includes('/images/')) {
+      return c.json({ error: 'Invalid image path' }, 400);
+    }
+
+    // Get image from R2
+    const object = await c.env.R2_BUCKET.get(path);
+
+    if (!object) {
+      return c.json({ error: 'Image not found' }, 404);
+    }
+
+    const headers = new Headers();
+    headers.set('Content-Type', object.httpMetadata?.contentType || 'image/jpeg');
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    headers.set('ETag', object.httpEtag);
+    // Allow cross-origin access
+    headers.set('Access-Control-Allow-Origin', '*');
+
+    return new Response(object.body, { headers });
+  } catch (error) {
+    console.error('Public image error:', error);
+    return c.json({ error: 'Server error' }, 500);
+  }
+});
+
+/**
  * GET /public/check/:username
  * Check if a username exists and has showcase enabled
  */
@@ -109,7 +143,7 @@ publicRouter.get('/check/:username', async (c) => {
     }
 
     const userInfo = await getUserByUsername(username, c.env);
-    
+
     return c.json({
       exists: !!userInfo,
       showcaseEnabled: userInfo?.showcaseEnabled || false,

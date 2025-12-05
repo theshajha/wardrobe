@@ -1,48 +1,32 @@
-import { SyncSettings } from '@/components/SyncSettings'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { exportAllData, exportWithImages, getSyncMeta, getStorageStats, importAllData, importWithImages } from '@/db'
-import { hasOptedOut, isAnalyticsEnabled, optIn, optOut, trackDataExported, trackDataImported, trackDemoEntered } from '@/lib/analytics'
+import { useAuth } from '@/contexts/AuthContext'
+import { useProfile } from '@/hooks/useProfile'
+import { hasOptedOut, isAnalyticsEnabled, optIn, optOut, trackDemoEntered } from '@/lib/analytics'
 import { enterDemoMode, exitDemoMode, getDemoType, getDemoTypeLabel, isDemoMode, type DemoType } from '@/lib/demo'
-import { SYNC_API_URL } from '@/lib/sync/types'
-import { formatBytes } from '@/lib/utils'
-import { useShowcase } from '@/hooks/useShowcase'
-import { useSync } from '@/hooks/useSync'
 import {
   AlertTriangle,
   BarChart3,
-  Calendar,
   Check,
-  Cloud,
   Copy,
-  Database,
   DollarSign,
-  Download,
   ExternalLink,
   Eye,
   EyeOff,
   FlaskConical,
-  FolderOpen,
-  HardDrive,
-  ImageIcon,
   Info,
   Loader2,
-  Package,
   Settings as SettingsIcon,
   Star,
-  Upload,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const PREFERENCES_KEY = 'fitsome-preferences'
 
 const CURRENCIES = [
   { id: 'USD', name: 'US Dollar', symbol: '$' },
@@ -53,6 +37,9 @@ const CURRENCIES = [
   { id: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
   { id: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
 ]
+
+// Fallback for non-authenticated users (localStorage)
+const PREFERENCES_KEY = 'fitsome-preferences'
 
 export function getDefaultCurrency(): string {
   try {
@@ -78,69 +65,42 @@ export function setDefaultCurrency(currency: string): void {
   }
 }
 
-interface StorageStats {
-  totalItems: number
-  itemsWithImages: number
-  totalImageSize: number
-  metadataSize: number
-  totalEstimatedSize: number
-  averageImageSize: number
-}
-
-interface ExportSettings {
-  autoExportEnabled: boolean
-  autoExportInterval: string // 'daily', 'weekly', 'monthly'
-  lastExportDate: string | null
-  exportFolderHandle: FileSystemDirectoryHandle | null
-  exportFolderName: string | null
-}
-
-const STORAGE_KEY = 'fitsome-export-settings'
-
 export default function Settings() {
   const navigate = useNavigate()
-  const [exporting, setExporting] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [exportResult, setExportResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [storageStats, setStorageStats] = useState<StorageStats | null>(null)
-  const [exportSettings, setExportSettings] = useState<ExportSettings>({
-    autoExportEnabled: false,
-    autoExportInterval: 'weekly',
-    lastExportDate: null,
-    exportFolderHandle: null,
-    exportFolderName: null,
-  })
-  const [folderSupported, setFolderSupported] = useState(false)
+  const { isAuthenticated } = useAuth()
+  const profile = useProfile()
+
+  // Local state for form inputs
+  const [displayName, setDisplayName] = useState('')
+  const [displayNameSaved, setDisplayNameSaved] = useState(false)
   const [defaultCurrency, setDefaultCurrencyState] = useState('USD')
+  const [currencySaved, setCurrencySaved] = useState(false)
+  const [showcaseToggling, setShowcaseToggling] = useState(false)
+  const [showcaseCopied, setShowcaseCopied] = useState(false)
+  const [showShowcaseInfo, setShowShowcaseInfo] = useState(false)
+
+  // Demo mode state
   const [isDemo, setIsDemo] = useState(false)
   const [currentDemoType, setCurrentDemoType] = useState<DemoType | null>(null)
   const [demoLoading, setDemoLoading] = useState(false)
   const [showDemoDialog, setShowDemoDialog] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Showcase (Public Profile) state
-  const [syncState] = useSync()
-  const showcase = useShowcase(syncState.isAuthenticated)
-  const [showcaseCopied, setShowcaseCopied] = useState(false)
-  const [showShowcaseInfo, setShowShowcaseInfo] = useState(false)
-
-  // Display name state
-  const [displayName, setDisplayName] = useState('')
-  const [displayNameSaved, setDisplayNameSaved] = useState(false)
 
   useEffect(() => {
-    loadStorageStats()
-    loadExportSettings()
-    setDefaultCurrencyState(getDefaultCurrency())
-    setFolderSupported('showDirectoryPicker' in window)
+    document.title = 'Settings | Fitso.me'
     setIsDemo(isDemoMode())
     setCurrentDemoType(getDemoType())
   }, [])
 
+  // Sync form state with profile data when it loads
   useEffect(() => {
-    document.title = 'Settings | Fitso.me'
-  }, [])
+    if (profile.profile) {
+      setDisplayName(profile.profile.display_name || '')
+      setDefaultCurrencyState(profile.profile.default_currency || 'USD')
+    } else if (!isAuthenticated) {
+      // Fallback to localStorage for non-authenticated users
+      setDefaultCurrencyState(getDefaultCurrency())
+    }
+  }, [profile.profile, isAuthenticated])
 
   const handleDemoToggle = async () => {
     if (isDemo) {
@@ -152,7 +112,6 @@ export default function Settings() {
       }
       setDemoLoading(false)
     } else {
-      // Show selection dialog
       setShowDemoDialog(true)
     }
   }
@@ -169,299 +128,45 @@ export default function Settings() {
     setDemoLoading(false)
   }
 
+  const handleDisplayNameSave = async () => {
+    if (!displayName.trim()) return
+
+    const success = await profile.updateDisplayName(displayName)
+    if (success) {
+      setDisplayNameSaved(true)
+      setTimeout(() => setDisplayNameSaved(false), 2000)
+    }
+  }
+
+  const handleCurrencyChange = async (currency: string) => {
+    setDefaultCurrencyState(currency)
+
+    if (isAuthenticated) {
+      const success = await profile.updateCurrency(currency)
+      if (success) {
+        setCurrencySaved(true)
+        setTimeout(() => setCurrencySaved(false), 2000)
+      }
+    } else {
+      // Fallback to localStorage for non-authenticated users
+      setDefaultCurrency(currency)
+    }
+  }
+
+  const handleShowcaseToggle = async () => {
+    setShowcaseToggling(true)
+    await profile.toggleShowcase()
+    setShowcaseToggling(false)
+  }
+
   const handleCopyShowcaseUrl = () => {
-    const url = showcase.getPublicUrl()
+    const url = profile.getPublicUrl()
     if (url) {
       navigator.clipboard.writeText(url)
       setShowcaseCopied(true)
       setTimeout(() => setShowcaseCopied(false), 2000)
     }
   }
-
-  const handleDisplayNameSave = async () => {
-    if (!syncState.isAuthenticated || !displayName.trim()) return
-
-    try {
-      const meta = await getSyncMeta()
-      const response = await fetch(`${SYNC_API_URL}/auth/display-name`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${meta.sessionToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ displayName: displayName.trim() }),
-      })
-      const result = await response.json()
-      if (result.success) {
-        setDisplayNameSaved(true)
-        setTimeout(() => setDisplayNameSaved(false), 2000)
-        showcase.refresh() // Refresh showcase to update display name
-      }
-    } catch (error) {
-      console.error('Failed to update display name:', error)
-    }
-  }
-
-  // Load display name from showcase
-  useEffect(() => {
-    if (syncState.isAuthenticated && showcase.username) {
-      // Get display name from showcase API
-      const fetchDisplayName = async () => {
-        try {
-          const meta = await getSyncMeta()
-          const response = await fetch(`${SYNC_API_URL}/auth/showcase`, {
-            headers: { 'Authorization': `Bearer ${meta.sessionToken}` },
-          })
-          const data = await response.json()
-          if (data.success && data.displayName) {
-            setDisplayName(data.displayName)
-          }
-        } catch (error) {
-          console.error('Failed to fetch display name:', error)
-        }
-      }
-      fetchDisplayName()
-    }
-  }, [syncState.isAuthenticated, showcase.username])
-
-  // Auto-export check on mount and interval
-  useEffect(() => {
-    if (exportSettings.autoExportEnabled && exportSettings.exportFolderHandle) {
-      checkAndRunAutoExport()
-
-      // Check every hour while app is open
-      const interval = setInterval(checkAndRunAutoExport, 60 * 60 * 1000)
-      return () => clearInterval(interval)
-    }
-  }, [exportSettings.autoExportEnabled, exportSettings.exportFolderHandle, exportSettings.autoExportInterval])
-
-  const loadStorageStats = async () => {
-    const stats = await getStorageStats()
-    setStorageStats(stats)
-  }
-
-  const loadExportSettings = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        setExportSettings(prev => ({
-          ...prev,
-          autoExportEnabled: parsed.autoExportEnabled || false,
-          autoExportInterval: parsed.autoExportInterval || 'weekly',
-          lastExportDate: parsed.lastExportDate || null,
-          exportFolderName: parsed.exportFolderName || null,
-          // Note: FileSystemDirectoryHandle can't be serialized, need to re-select folder
-        }))
-      }
-    } catch (e) {
-      console.error('Failed to load export settings:', e)
-    }
-  }
-
-  const saveExportSettings = (settings: Partial<ExportSettings>) => {
-    const newSettings = { ...exportSettings, ...settings }
-    setExportSettings(newSettings)
-
-    // Save to localStorage (excluding handle which can't be serialized)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      autoExportEnabled: newSettings.autoExportEnabled,
-      autoExportInterval: newSettings.autoExportInterval,
-      lastExportDate: newSettings.lastExportDate,
-      exportFolderName: newSettings.exportFolderName,
-    }))
-  }
-
-  const checkAndRunAutoExport = useCallback(async () => {
-    if (!exportSettings.lastExportDate || !exportSettings.exportFolderHandle) return
-
-    const lastExport = new Date(exportSettings.lastExportDate)
-    const now = new Date()
-    const daysSinceExport = Math.floor((now.getTime() - lastExport.getTime()) / (1000 * 60 * 60 * 24))
-
-    let shouldExport = false
-    switch (exportSettings.autoExportInterval) {
-      case 'daily':
-        shouldExport = daysSinceExport >= 1
-        break
-      case 'weekly':
-        shouldExport = daysSinceExport >= 7
-        break
-      case 'monthly':
-        shouldExport = daysSinceExport >= 30
-        break
-    }
-
-    if (shouldExport) {
-      await handleQuickExport()
-    }
-  }, [exportSettings])
-
-  const handleExport = async () => {
-    setExporting(true)
-    setExportResult(null)
-    try {
-      const data = await exportAllData()
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `fitsome-backup-${new Date().toISOString().split('T')[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      saveExportSettings({ lastExportDate: new Date().toISOString() })
-      setExportResult({ success: true, message: 'Backup downloaded successfully!' })
-    } catch (error) {
-      console.error('Export failed:', error)
-      setExportResult({ success: false, message: 'Export failed. Please try again.' })
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const handleQuickExport = async () => {
-    if (!exportSettings.exportFolderHandle) {
-      setExportResult({ success: false, message: 'Please select a folder first' })
-      return
-    }
-
-    setExporting(true)
-    setExportResult(null)
-    try {
-      const data = await exportAllData()
-      const fileName = `fitsome-backup-${new Date().toISOString().split('T')[0]}.json`
-
-      // Create file in selected folder
-      const fileHandle = await exportSettings.exportFolderHandle.getFileHandle(fileName, { create: true })
-      const writable = await fileHandle.createWritable()
-      await writable.write(JSON.stringify(data, null, 2))
-      await writable.close()
-
-      saveExportSettings({ lastExportDate: new Date().toISOString() })
-      setExportResult({ success: true, message: `Exported to ${exportSettings.exportFolderName}/${fileName}` })
-      loadStorageStats()
-    } catch (e) {
-      console.error('Quick export failed:', e)
-      // Permission might have been revoked, clear the handle
-      if ((e as Error).name === 'NotAllowedError') {
-        saveExportSettings({ exportFolderHandle: null, exportFolderName: null })
-        setExportResult({ success: false, message: 'Folder permission expired. Please select folder again.' })
-      } else {
-        setExportResult({ success: false, message: 'Export failed. Please try again.' })
-      }
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setImporting(true)
-    setImportResult(null)
-
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      const results = await importAllData(data)
-
-      setImportResult({
-        success: true,
-        message: `Successfully imported: ${results.items} items, ${results.trips} trips, ${results.outfits} outfits`,
-      })
-      loadStorageStats()
-    } catch (error) {
-      setImportResult({
-        success: false,
-        message: 'Failed to parse import file. Make sure it\'s a valid JSON backup.',
-      })
-    } finally {
-      setImporting(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
-  const handleCurrencyChange = (currency: string) => {
-    setDefaultCurrencyState(currency)
-    setDefaultCurrency(currency)
-  }
-
-  const handleExportWithImages = async () => {
-    try {
-      // @ts-ignore - File System Access API
-      const handle = await window.showDirectoryPicker({
-        mode: 'readwrite',
-      })
-
-      setExporting(true)
-      setExportResult(null)
-
-      const result = await exportWithImages(handle)
-
-      setExportResult({
-        success: true,
-        message: `Exported ${result.jsonFileName} with ${result.imageCount} images to ${handle.name}/`
-      })
-      saveExportSettings({ lastExportDate: new Date().toISOString() })
-      loadStorageStats()
-
-      // Track export
-      trackDataExported(true)
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
-        setExportResult({ success: false, message: 'Export failed: ' + (e as Error).message })
-      }
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const handleImportFromFolder = async () => {
-    try {
-      // @ts-ignore - File System Access API
-      const handle = await window.showDirectoryPicker({
-        mode: 'read',
-      })
-
-      setImporting(true)
-      setImportResult(null)
-
-      const results = await importWithImages(handle)
-
-      setImportResult({
-        success: true,
-        message: `Imported: ${results.items} items, ${results.trips} trips, ${results.outfits} outfits, ${results.images} images`
-      })
-      loadStorageStats()
-
-      // Track import
-      trackDataImported(results.items, results.images > 0)
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
-        setImportResult({ success: false, message: 'Import failed: ' + (e as Error).message })
-      }
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  // Estimate capacity (conservative: 500MB usable for this app)
-  const estimatedCapacity = 500 * 1024 * 1024 // 500 MB
-  const usagePercentage = storageStats ? (storageStats.totalEstimatedSize / estimatedCapacity) * 100 : 0
-  const estimatedItemsCapacity = storageStats && storageStats.averageImageSize > 0
-    ? Math.floor(estimatedCapacity / (storageStats.averageImageSize + 1024))
-    : 5000
 
   return (
     <div className="p-8 space-y-6 max-w-4xl">
@@ -474,14 +179,10 @@ export default function Settings() {
         <p className="text-muted-foreground mt-1">Manage preferences and data</p>
       </div>
 
-      {/* Tabs for organized settings */}
+      {/* Settings Content */}
       <Tabs defaultValue="preferences" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="storage" className="gap-1">
-            <Cloud className="h-3 w-3" />
-            Storage & Backup
-          </TabsTrigger>
         </TabsList>
 
         {/* Preferences Tab */}
@@ -494,8 +195,8 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Display Name */}
-              {syncState.isAuthenticated && (
+              {/* Display Name - Only show for authenticated users */}
+              {isAuthenticated && (
                 <div className="space-y-2">
                   <Label htmlFor="displayName" className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
@@ -509,13 +210,20 @@ export default function Settings() {
                       placeholder="Your name"
                       maxLength={50}
                       className="max-w-xs"
+                      disabled={profile.loading}
                     />
                     <Button
                       size="sm"
                       onClick={handleDisplayNameSave}
-                      disabled={!displayName.trim()}
+                      disabled={!displayName.trim() || profile.saving}
                     >
-                      {displayNameSaved ? <Check className="h-4 w-4" /> : 'Save'}
+                      {profile.saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : displayNameSaved ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        'Save'
+                      )}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -528,8 +236,17 @@ export default function Settings() {
                 <Label htmlFor="currency" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   Default Currency
+                  {currencySaved && (
+                    <span className="text-xs text-emerald-500 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Saved
+                    </span>
+                  )}
                 </Label>
-                <Select value={defaultCurrency} onValueChange={handleCurrencyChange}>
+                <Select
+                  value={defaultCurrency}
+                  onValueChange={handleCurrencyChange}
+                  disabled={profile.loading}
+                >
                   <SelectTrigger id="currency" className="w-full max-w-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -672,7 +389,6 @@ export default function Settings() {
                       } else {
                         optOut()
                       }
-                      // Force re-render
                       window.location.reload()
                     }}
                   >
@@ -690,7 +406,7 @@ export default function Settings() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
-                {showcase.enabled ? (
+                {profile.profile?.showcase_enabled ? (
                   <Eye className="h-4 w-4 text-emerald-500" />
                 ) : (
                   <EyeOff className="h-4 w-4" />
@@ -707,15 +423,20 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!syncState.isAuthenticated ? (
+              {!isAuthenticated ? (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-amber-600">Sync Required</p>
+                    <p className="font-medium text-amber-600">Account Required</p>
                     <p className="text-muted-foreground text-xs mt-1">
-                      Enable Cloud Sync in the Storage & Backup tab to use Public Profile
+                      Create an account or sign in to use Public Profile
                     </p>
                   </div>
+                </div>
+              ) : profile.loading ? (
+                <div className="flex items-center gap-2 py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Loading profile...</span>
                 </div>
               ) : (
                 <>
@@ -723,21 +444,21 @@ export default function Settings() {
                     <div className="space-y-0.5 flex-1">
                       <p className="text-sm font-medium">Share Your Showcase</p>
                       <p className="text-xs text-muted-foreground">
-                        {showcase.enabled
+                        {profile.profile?.showcase_enabled
                           ? 'Your featured items are visible to anyone with the link'
                           : 'Let others see your featured items via a public link'
                         }
                       </p>
                     </div>
                     <Button
-                      variant={showcase.enabled ? 'default' : 'outline'}
+                      variant={profile.profile?.showcase_enabled ? 'default' : 'outline'}
                       size="sm"
-                      onClick={showcase.toggle}
-                      disabled={showcase.loading}
+                      onClick={handleShowcaseToggle}
+                      disabled={showcaseToggling}
                     >
-                      {showcase.loading ? (
+                      {showcaseToggling ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : showcase.enabled ? (
+                      ) : profile.profile?.showcase_enabled ? (
                         'Disable'
                       ) : (
                         'Enable'
@@ -745,11 +466,11 @@ export default function Settings() {
                     </Button>
                   </div>
 
-                  {showcase.enabled && showcase.username && (
+                  {profile.profile?.showcase_enabled && profile.username && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/50 border">
                         <code className="flex-1 text-xs truncate">
-                          {showcase.getPublicUrl()}
+                          {profile.getPublicUrl()}
                         </code>
                         <Button
                           variant="ghost"
@@ -770,7 +491,7 @@ export default function Settings() {
                           asChild
                         >
                           <a
-                            href={`/${showcase.username}`}
+                            href={`/${profile.username}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -787,10 +508,10 @@ export default function Settings() {
                     </div>
                   )}
 
-                  {showcase.error && (
+                  {profile.error && (
                     <div className="flex items-start gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
                       <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-red-600">{showcase.error}</p>
+                      <p className="text-xs text-red-600">{profile.error}</p>
                     </div>
                   )}
                 </>
@@ -884,142 +605,10 @@ export default function Settings() {
                   <span className="text-xs bg-secondary px-2 py-0.5 rounded">v1.0.0</span>
                 </p>
                 <p>Your stuff. Your style. Your way.</p>
-                <p className="text-xs mt-2 text-muted-foreground/70">Built with React, Vite, IndexedDB & Tailwind</p>
+                <p className="text-xs mt-2 text-muted-foreground/70">Built with React, Vite, Supabase & Tailwind</p>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Storage & Backup Tab */}
-        <TabsContent value="storage" className="space-y-4 mt-4">
-          {/* Cloud Sync Section */}
-          <SyncSettings />
-
-          {/* Local Storage Section */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <HardDrive className="h-4 w-4" />
-                Local Storage
-              </CardTitle>
-              <CardDescription>
-                Data stored in your browser
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {storageStats && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-lg bg-secondary/50">
-                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <Package className="h-3 w-3" />
-                        <span className="text-xs">Items</span>
-                      </div>
-                      <p className="text-xl font-bold">{storageStats.totalItems}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-secondary/50">
-                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <ImageIcon className="h-3 w-3" />
-                        <span className="text-xs">With Images</span>
-                      </div>
-                      <p className="text-xl font-bold">{storageStats.itemsWithImages}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Storage Used</span>
-                      <span className="font-medium">{formatBytes(storageStats.totalEstimatedSize)} / ~500 MB</span>
-                    </div>
-                    <Progress value={Math.min(usagePercentage, 100)} className="h-1.5" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-2 rounded bg-secondary/30">
-                      <span className="text-muted-foreground">Images:</span>{' '}
-                      <span className="font-medium">{formatBytes(storageStats.totalImageSize)}</span>
-                    </div>
-                    <div className="p-2 rounded bg-secondary/30">
-                      <span className="text-muted-foreground">Avg/Image:</span>{' '}
-                      <span className="font-medium">{formatBytes(storageStats.averageImageSize)}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-                    <p className="text-xs text-muted-foreground">
-                      <strong className="text-blue-500">Capacity:</strong> ~{estimatedItemsCapacity.toLocaleString()} items with images
-                    </p>
-                  </div>
-                </>
-              )}
-
-              <div className="p-2 rounded bg-secondary/30 text-xs">
-                <span className="text-muted-foreground">Type:</span>{' '}
-                <span className="font-mono">IndexedDB (Browser)</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Backup & Restore Section */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Backup & Restore
-              </CardTitle>
-              <CardDescription>
-                Export your data with images for complete backup
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {folderSupported ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={handleExportWithImages} disabled={exporting} className="gap-2">
-                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    Export All
-                  </Button>
-                  <Button onClick={handleImportFromFolder} disabled={importing} variant="outline" className="gap-2">
-                    {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
-                    Import
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={handleExport} disabled={exporting} variant="outline" className="gap-2">
-                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    Export JSON
-                  </Button>
-                  <Button onClick={handleImportClick} disabled={importing} variant="outline" className="gap-2">
-                    {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    Import JSON
-                  </Button>
-                </div>
-              )}
-              <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
-
-              {(exportResult || importResult) && (
-                <div className={`p-2 rounded text-xs flex items-center gap-2 ${(exportResult?.success || importResult?.success) ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
-                  {(exportResult?.success || importResult?.success) ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                  {exportResult?.message || importResult?.message}
-                </div>
-              )}
-
-              {exportSettings.lastExportDate && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  Last export: {new Date(exportSettings.lastExportDate).toLocaleString()}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Warning about local storage */}
-          <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 flex items-start gap-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
-              Local data is stored in your browser. Clearing browser data deletes everything. Use Cloud Sync or regular backups to protect your data.
-            </p>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

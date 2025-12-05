@@ -1,10 +1,12 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { db, type Item } from '@/db'
-import { useShowcase } from '@/hooks/useShowcase'
-import { useSync } from '@/hooks/useSync'
-import { cn, formatSize } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
+import { type Item } from '@/db'
+import { useItems } from '@/hooks/useItems'
+import { useProfile } from '@/hooks/useProfile'
+import { getImageUrl } from '@/lib/imageUrl'
+import { cn } from '@/lib/utils'
 import {
     AlertCircle,
     Briefcase,
@@ -13,13 +15,15 @@ import {
     ExternalLink,
     Footprints,
     Laptop,
+    Loader2,
     Package,
     Shirt,
     Sparkles,
     Star,
     Watch
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 const categoryIcons: Record<string, typeof Package> = {
     clothing: Shirt,
@@ -38,47 +42,51 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function Showcase() {
-    const [items, setItems] = useState<Item[]>([])
-    const [featuredItems, setFeaturedItems] = useState<Item[]>([])
-    const [loading, setLoading] = useState(true)
+    // Use unified items hook for Supabase
+    const { items, isLoading: loading, updateItem } = useItems()
+    const { isAuthenticated, username } = useAuth()
+    const { profile, toggleShowcase, saving } = useProfile()
     const [copied, setCopied] = useState(false)
-
-    // Sync and showcase state
-    const [syncState] = useSync()
-    const showcase = useShowcase(syncState.isAuthenticated)
-
-    useEffect(() => {
-        loadItems()
-    }, [])
 
     useEffect(() => {
         document.title = 'Showcase | Fitso.me'
     }, [])
 
-    const loadItems = async () => {
-        const data = await db.items.toArray()
-        setItems(data)
-        setFeaturedItems(data.filter(item => item.isFeatured))
-        setLoading(false)
-    }
+    // Compute featured items from items
+    const featuredItems = useMemo(() => items.filter(item => item.isFeatured), [items])
 
     const toggleFeatured = async (item: Item) => {
-        const updated = { ...item, isFeatured: !item.isFeatured, updatedAt: new Date().toISOString() }
-        await db.items.put(updated)
-        loadItems()
+        try {
+            await updateItem(item.id, { isFeatured: !item.isFeatured })
+            toast.success(item.isFeatured ? 'Removed from showcase' : 'Added to showcase')
+        } catch (error) {
+            console.error('Error updating item:', error)
+            toast.error('Failed to update item')
+        }
+    }
+
+    const getPublicUrl = () => {
+        if (!username) return null
+        return `${window.location.origin}/${username}`
     }
 
     const handleCopyUrl = async () => {
-        const url = showcase.getPublicUrl()
+        const url = getPublicUrl()
         if (url) {
             await navigator.clipboard.writeText(url)
             setCopied(true)
+            toast.success('Link copied to clipboard')
             setTimeout(() => setCopied(false), 2000)
         }
     }
 
     const handleEnableProfile = async () => {
-        await showcase.toggle()
+        const success = await toggleShowcase()
+        if (success) {
+            toast.success(profile?.showcase_enabled ? 'Public profile disabled' : 'Public profile enabled')
+        } else {
+            toast.error('Failed to update profile')
+        }
     }
 
     const nonFeaturedItems = items.filter(item => !item.isFeatured)
@@ -89,242 +97,219 @@ export default function Showcase() {
             <div className="flex flex-col gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 md:gap-3">
-                        <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-amber-400" />
-                        Showcase
+                        <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-amber-500 shrink-0" />
+                        <span>Showcase</span>
                     </h1>
-                    <p className="text-muted-foreground text-sm md:text-base">Feature your best items and share them publicly</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Feature your best items for public display
+                    </p>
                 </div>
 
-                {/* Public Profile Card */}
-                <Card>
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                                <h3 className="font-semibold flex items-center gap-2 mb-1">
-                                    <ExternalLink className="h-4 w-4" />
-                                    Public Profile
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                    Share your featured items with the world
-                                </p>
-                            </div>
-                        </div>
-
-                        {!syncState.isAuthenticated ? (
-                            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                                    Enable sync in Settings to share your public profile
-                                </p>
-                            </div>
-                        ) : showcase.enabled ? (
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                    <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                    <span className="text-sm text-muted-foreground">Your public profile is live!</span>
+                {/* Public Profile Status */}
+                {isAuthenticated && (
+                    <Card className={profile?.showcase_enabled ? 'border-emerald-500/50' : ''}>
+                        <CardContent className="p-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                    <div className={cn(
+                                        "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+                                        profile?.showcase_enabled ? "bg-emerald-500/10" : "bg-secondary"
+                                    )}>
+                                        {profile?.showcase_enabled ? (
+                                            <Check className="h-5 w-5 text-emerald-500" />
+                                        ) : (
+                                            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="font-medium">
+                                            {profile?.showcase_enabled ? 'Public Profile Active' : 'Public Profile Disabled'}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {profile?.showcase_enabled
+                                                ? 'Anyone with your link can see your featured items'
+                                                : 'Enable to share your showcase with others'
+                                            }
+                                        </p>
+                                    </div>
                                 </div>
-
-                                {showcase.getPublicUrl() && (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <code className="flex-1 text-xs p-2 rounded bg-secondary truncate">
-                                                {showcase.getPublicUrl()}
-                                            </code>
+                                <div className="flex items-center gap-2">
+                                    {profile?.showcase_enabled && username && (
+                                        <>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={handleCopyUrl}
+                                                className="gap-1.5"
                                             >
-                                                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                                {copied ? 'Copied!' : 'Copy Link'}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 asChild
                                             >
-                                                <a href={showcase.getPublicUrl()!} target="_blank" rel="noopener noreferrer">
-                                                    <ExternalLink className="h-3 w-3" />
+                                                <a href={`/${username}`} target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-3.5 w-3.5" />
                                                 </a>
                                             </Button>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            💡 Only items marked as Featured will be visible on your public profile
-                                        </p>
-                                    </div>
-                                )}
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleEnableProfile}
-                                    disabled={showcase.loading}
-                                >
-                                    Disable Public Profile
-                                </Button>
+                                        </>
+                                    )}
+                                    <Button
+                                        variant={profile?.showcase_enabled ? 'outline' : 'default'}
+                                        size="sm"
+                                        onClick={handleEnableProfile}
+                                        disabled={saving}
+                                    >
+                                        {saving ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : profile?.showcase_enabled ? (
+                                            'Disable'
+                                        ) : (
+                                            'Enable'
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <p className="text-sm text-muted-foreground">
-                                    Enable your public profile to share your featured items with a unique URL.
-                                    Only items marked as Featured will be visible.
-                                </p>
-                                <Button
-                                    size="sm"
-                                    onClick={handleEnableProfile}
-                                    disabled={showcase.loading || featuredItems.length === 0}
-                                    className="gap-2"
-                                >
-                                    <ExternalLink className="h-4 w-4" />
-                                    Enable Public Profile
-                                </Button>
-                                {featuredItems.length === 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Add some featured items first before enabling your profile
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {showcase.error && (
-                            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                                <p className="text-sm text-red-500">{showcase.error}</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Featured Items */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
-                        Featured Items
-                        <Badge variant="secondary">{featuredItems.length}</Badge>
-                    </h2>
-                </div>
-
-                {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
-                    </div>
-                ) : featuredItems.length === 0 ? (
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Sparkles className="h-12 w-12 mb-4 text-muted-foreground opacity-50" />
-                            <h3 className="text-lg font-semibold mb-2">No featured items yet</h3>
-                            <p className="text-muted-foreground mb-4 max-w-md">
-                                Click the star icon on any item below to add it to your showcase.
-                                Featured items will appear on your public profile.
-                            </p>
                         </CardContent>
                     </Card>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {featuredItems.map((item) => {
-                            const Icon = categoryIcons[item.category] || Package
-                            const sizeDisplay = formatSize(item.size)
-
-                            return (
-                                <Card key={item.id} className="group relative overflow-hidden border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent">
-                                    <div className="absolute top-2 right-2 z-10">
-                                        <Button
-                                            variant="secondary"
-                                            size="icon"
-                                            className="h-8 w-8 bg-amber-500 hover:bg-amber-600 text-black"
-                                            onClick={() => toggleFeatured(item)}
-                                        >
-                                            <Star className="h-4 w-4 fill-current" />
-                                        </Button>
-                                    </div>
-
-                                    {item.imageData ? (
-                                        <div className="aspect-square overflow-hidden">
-                                            <img src={item.imageData} alt={item.name} className="w-full h-full object-cover" />
-                                        </div>
-                                    ) : (
-                                        <div className={cn(
-                                            "aspect-square flex items-center justify-center bg-gradient-to-br",
-                                            categoryColors[item.category] || 'from-gray-400 to-gray-500'
-                                        )}>
-                                            <Icon className="h-16 w-16 text-white/80" />
-                                        </div>
-                                    )}
-
-                                    <CardContent className="p-4">
-                                        <h3 className="font-semibold truncate">{item.name}</h3>
-                                        <p className="text-sm text-muted-foreground">
-                                            {item.subcategory || item.category}
-                                            {item.brand && ` • ${item.brand}`}
-                                        </p>
-                                        {sizeDisplay !== '—' && (
-                                            <Badge variant="secondary" className="mt-2 text-xs">
-                                                Size: {sizeDisplay}
-                                            </Badge>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
                 )}
             </div>
 
-            {/* All Items (to select for featuring) */}
-            <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    All Items
-                    <Badge variant="outline">{nonFeaturedItems.length}</Badge>
+            {/* Featured Items */}
+            <div>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Star className="h-5 w-5 text-amber-500" />
+                    Featured Items ({featuredItems.length})
                 </h2>
 
-                {nonFeaturedItems.length === 0 && !loading ? (
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-                            <Check className="h-8 w-8 mb-2 text-green-500" />
-                            <p className="text-muted-foreground">All items are featured!</p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                        {nonFeaturedItems.map((item) => {
+                {loading ? (
+                    <div className="flex items-center justify-center h-48">
+                        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+                    </div>
+                ) : featuredItems.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                        {featuredItems.map(item => {
                             const Icon = categoryIcons[item.category] || Package
 
                             return (
                                 <Card
                                     key={item.id}
-                                    className="group relative cursor-pointer hover:border-amber-500/50 transition-colors overflow-hidden"
+                                    className="overflow-hidden group cursor-pointer ring-2 ring-amber-500/50"
                                     onClick={() => toggleFeatured(item)}
                                 >
-                                    {item.imageData ? (
-                                        <div className="aspect-square overflow-hidden rounded-t-lg">
-                                            <img src={item.imageData} alt={item.name} className="w-full h-full object-cover" />
+                                    <div className="aspect-square relative">
+                                        {item.imageRef ? (
+                                            <img
+                                                src={getImageUrl(item.imageRef) || ''}
+                                                alt={item.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className={cn(
+                                                "w-full h-full flex items-center justify-center bg-gradient-to-br",
+                                                categoryColors[item.category] || 'from-gray-400 to-gray-500'
+                                            )}>
+                                                <Icon className="h-10 w-10 text-white/80" />
+                                            </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                            <Badge className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 text-foreground">
+                                                Click to remove
+                                            </Badge>
                                         </div>
-                                    ) : (
-                                        <div className={cn(
-                                            "aspect-square flex items-center justify-center rounded-t-lg bg-gradient-to-br",
-                                            categoryColors[item.category] || 'from-gray-400 to-gray-500'
-                                        )}>
-                                            <Icon className="h-8 w-8 text-white/80" />
-                                        </div>
-                                    )}
-                                    <CardContent className="p-2">
-                                        <p className="text-xs font-medium truncate">{item.name}</p>
-                                        <p className="text-xs text-muted-foreground truncate">
+                                        <Badge className="absolute top-2 right-2 bg-amber-500">
+                                            <Star className="h-3 w-3 mr-1 fill-current" />
+                                            Featured
+                                        </Badge>
+                                    </div>
+                                    <CardContent className="p-2 md:p-3">
+                                        <p className="font-medium text-xs md:text-sm truncate">{item.name}</p>
+                                        <p className="text-[10px] md:text-xs text-muted-foreground truncate">
                                             {item.subcategory || item.category}
                                         </p>
                                     </CardContent>
-                                    {/* Hover overlay */}
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <Star className="h-6 w-6 text-amber-400" />
-                                            <span className="text-white text-xs font-medium">Add to Showcase</span>
-                                        </div>
-                                    </div>
                                 </Card>
                             )
                         })}
                     </div>
+                ) : (
+                    <Card>
+                        <CardContent className="p-8 text-center">
+                            <Star className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No featured items yet</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Click on items below to add them to your showcase
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            {/* All Items */}
+            <div>
+                <h2 className="text-lg font-semibold mb-4">
+                    All Items ({nonFeaturedItems.length})
+                </h2>
+
+                {loading ? (
+                    <div className="flex items-center justify-center h-48">
+                        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+                    </div>
+                ) : nonFeaturedItems.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                        {nonFeaturedItems.map(item => {
+                            const Icon = categoryIcons[item.category] || Package
+
+                            return (
+                                <Card
+                                    key={item.id}
+                                    className="overflow-hidden group cursor-pointer hover:ring-2 hover:ring-amber-500/50 transition-all"
+                                    onClick={() => toggleFeatured(item)}
+                                >
+                                    <div className="aspect-square relative">
+                                        {item.imageRef ? (
+                                            <img
+                                                src={getImageUrl(item.imageRef) || ''}
+                                                alt={item.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className={cn(
+                                                "w-full h-full flex items-center justify-center bg-gradient-to-br",
+                                                categoryColors[item.category] || 'from-gray-400 to-gray-500'
+                                            )}>
+                                                <Icon className="h-10 w-10 text-white/80" />
+                                            </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                            <Badge className="opacity-0 group-hover:opacity-100 transition-opacity bg-amber-500">
+                                                <Star className="h-3 w-3 mr-1" />
+                                                Add to Featured
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <CardContent className="p-2 md:p-3">
+                                        <p className="font-medium text-xs md:text-sm truncate">{item.name}</p>
+                                        <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+                                            {item.subcategory || item.category}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <Card>
+                        <CardContent className="p-8 text-center">
+                            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No items in inventory</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Add items to your inventory to feature them here
+                            </p>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         </div>

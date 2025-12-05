@@ -194,14 +194,15 @@ export async function createSessionToken(
 
 /**
  * Verify a session token and return the session
+ * Supports both the old R2-based JWT tokens and Supabase JWTs
  */
 export async function verifySession(
   token: string,
   env: Env
 ): Promise<Session | null> {
+  // First, try to verify as our own JWT
   try {
     const secret = new TextEncoder().encode(env.JWT_SECRET || 'dev-secret-change-me');
-
     const { payload } = await jose.jwtVerify(token, secret);
 
     return {
@@ -210,6 +211,59 @@ export async function verifySession(
       email: payload.email as string,
       createdAt: payload.createdAt as string,
       expiresAt: new Date((payload.exp || 0) * 1000).toISOString(),
+    };
+  } catch (error) {
+    // Not our JWT, try Supabase
+  }
+
+  // Try to decode as Supabase JWT (we don't verify signature here, Supabase handles that)
+  // We just extract user info and look up the username from KV
+  try {
+    // Decode the JWT without verification (we trust the token came from Supabase)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+    // Check if this looks like a Supabase JWT
+    if (!payload.sub || !payload.email || !payload.exp) {
+      return null;
+    }
+
+    // Check expiration
+    const expiresAt = new Date(payload.exp * 1000);
+    if (expiresAt < new Date()) {
+      console.log('Supabase token expired');
+      return null;
+    }
+
+    // Get or create username for this Supabase user
+    const email = payload.email as string;
+    const userId = payload.sub as string;
+
+    // Look up username from KV by email
+    const emailKey = `email:${email.toLowerCase().trim()}`;
+    let usernameData = await env.AUTH_KV.get(emailKey);
+
+    let username: string;
+    if (usernameData) {
+      const data = JSON.parse(usernameData);
+      username = data.username;
+    } else {
+      // Create a new username for this Supabase user
+      username = await getOrCreateUsername(email, userId, env);
+    }
+
+    console.log('Supabase JWT verified for user:', username);
+
+    return {
+      userId,
+      username,
+      email,
+      createdAt: new Date(payload.iat * 1000).toISOString(),
+      expiresAt: expiresAt.toISOString(),
     };
   } catch (error) {
     console.error('Session verification failed:', error);

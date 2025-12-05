@@ -1,54 +1,26 @@
 /**
  * Public Showcase Page
  * Displays a user's public inventory (no auth required)
- * Accessible at /showcase/:username
+ * Accessible at /:username
  */
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { SYNC_API_URL } from '@/lib/sync/types';
+import { getPublicShowcase, type PublicItem } from '@/lib/data/supabase/public';
+import { getImageUrl } from '@/lib/imageUrl';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ArrowLeft, Package, Shirt, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-interface ShowcaseItem {
-  id: string;
-  name: string;
-  category: string;
-  subcategory?: string;
-  color?: string;
-  brand?: string;
-  imageRef?: string;
-  imageHash?: string;
-  condition: string;
-  isFeatured?: boolean;
-}
-
-interface ShowcaseOutfit {
-  id: string;
-  name: string;
-  occasion?: string;
-  season?: string;
-  itemIds: string[];
-}
-
-interface ShowcaseData {
-  items: ShowcaseItem[];
-  outfits: ShowcaseOutfit[];
-  stats: {
-    totalItems: number;
-    totalOutfits: number;
-  };
-}
-
 export default function PublicShowcase() {
   const { username } = useParams<{ username: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ShowcaseData | null>(null);
+  const [items, setItems] = useState<PublicItem[]>([]);
   const [displayName, setDisplayName] = useState<string>('');
+  const [stats, setStats] = useState({ totalItems: 0, totalOutfits: 0 });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,17 +32,17 @@ export default function PublicShowcase() {
       }
 
       try {
-        const response = await fetch(`${SYNC_API_URL}/public/showcase/${username}`);
-        const result = await response.json();
+        const data = await getPublicShowcase(username);
 
-        if (!response.ok || !result.success) {
-          setError(result.error || 'Failed to load showcase');
+        if (!data) {
+          setError('Showcase not available');
           setLoading(false);
           return;
         }
 
-        setData(result.data);
-        setDisplayName(result.displayName || username);
+        setItems(data.items);
+        setDisplayName(data.profile.display_name || data.profile.username);
+        setStats(data.stats);
         setLoading(false);
       } catch (err) {
         console.error('Showcase fetch error:', err);
@@ -84,12 +56,12 @@ export default function PublicShowcase() {
 
   // Update page title and meta description
   useEffect(() => {
-    if (displayName && data) {
+    if (displayName && items.length >= 0) {
       document.title = `${displayName}'s Fit | Fitso.me`;
 
       // Update meta description
       const metaDescription = document.querySelector('meta[name="description"]');
-      const description = `Check out ${displayName}'s wardrobe collection on Fitso.me - ${data.stats.totalItems} items curated with style.`;
+      const description = `Check out ${displayName}'s wardrobe collection on Fitso.me - ${stats.totalItems} items curated with style.`;
       if (metaDescription) {
         metaDescription.setAttribute('content', description);
       } else {
@@ -108,34 +80,22 @@ export default function PublicShowcase() {
         metaDescription.setAttribute('content', 'Manage your wardrobe, track your style, and showcase your fit. 100% private, all data stays in your browser.');
       }
     };
-  }, [displayName, data]);
+  }, [displayName, items, stats.totalItems]);
 
   // Get unique categories
-  const categories = data?.items
-    ? [...new Set(data.items.map(item => item.category))]
+  const categories = items.length > 0
+    ? [...new Set(items.map(item => item.category))]
     : [];
 
   // Filter items by category
   const filteredItems = selectedCategory
-    ? data?.items.filter(item => item.category === selectedCategory)
-    : data?.items;
+    ? items.filter(item => item.category === selectedCategory)
+    : items;
 
-  // Build image URL
-  const getImageUrl = (item: ShowcaseItem) => {
-    // Extract hash from imageHash or imageRef
-    let hash: string | null = null;
-
-    if (item.imageHash) {
-      hash = item.imageHash;
-    } else if (item.imageRef) {
-      // imageRef format: "{username}/images/{hash}" or "images/{hash}"
-      const parts = item.imageRef.split('/');
-      hash = parts[parts.length - 1]; // Get last part (the hash)
-    }
-
-    if (!hash) return null;
-
-    return `${SYNC_API_URL}/public/showcase/${username}/image/${hash}`;
+  // Build image URL from image_url (which is the imageRef in Supabase)
+  const getItemImageUrl = (item: PublicItem) => {
+    if (!item.image_url) return null;
+    return getImageUrl(item.image_url);
   };
 
   if (loading) {
@@ -157,14 +117,14 @@ export default function PublicShowcase() {
             <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto" />
             <h1 className="text-xl font-semibold">Showcase Not Available</h1>
             <p className="text-muted-foreground">
-              {error === 'User not found' 
+              {error === 'User not found'
                 ? `The user "${username}" doesn't exist.`
-                : error === 'Showcase not enabled'
-                ? `This user hasn't enabled their public showcase.`
-                : error}
+                : error === 'Showcase not available'
+                  ? `This user hasn't enabled their public showcase yet.`
+                  : error}
             </p>
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -195,11 +155,11 @@ export default function PublicShowcase() {
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <Package className="h-4 w-4" />
-              {data?.stats.totalItems || 0} items
+              {stats.totalItems} items
             </span>
             <span className="flex items-center gap-1">
               <Shirt className="h-4 w-4" />
-              {data?.stats.totalOutfits || 0} outfits
+              {stats.totalOutfits} outfits
             </span>
             <Link to="/">
               <Button
@@ -219,7 +179,7 @@ export default function PublicShowcase() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">{displayName}'s Fit</h1>
           <p className="text-muted-foreground">
-            A curated collection of {data?.stats.totalItems || 0} items
+            A curated collection of {stats.totalItems} items
           </p>
         </div>
 
@@ -237,7 +197,7 @@ export default function PublicShowcase() {
               <Badge
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}
-                className="cursor-pointer"
+                className="cursor-pointer capitalize"
                 onClick={() => setSelectedCategory(category)}
               >
                 {category}
@@ -248,25 +208,25 @@ export default function PublicShowcase() {
 
         {/* Items Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
-          {filteredItems?.map(item => (
-            <Card 
-              key={item.id} 
+          {filteredItems.map(item => (
+            <Card
+              key={item.id}
               className={cn(
                 "overflow-hidden hover:shadow-lg transition-shadow",
-                item.isFeatured && "ring-2 ring-amber-500/50"
+                item.is_featured && "ring-2 ring-amber-500/50"
               )}
             >
               <div className="aspect-square relative">
-                {getImageUrl(item) ? (
+                {getItemImageUrl(item) ? (
                   <img
-                    src={getImageUrl(item)!}
+                    src={getItemImageUrl(item)!}
                     alt={item.name}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
                 ) : (
                   <div
-                    className="w-full h-full flex items-center justify-center"
+                    className="w-full h-full flex items-center justify-center bg-muted"
                     style={item.color ? {
                       background: `linear-gradient(135deg, ${item.color}, ${item.color}dd)`
                     } : undefined}
@@ -279,7 +239,7 @@ export default function PublicShowcase() {
                     />
                   </div>
                 )}
-                {item.isFeatured && (
+                {item.is_featured && (
                   <Badge className="absolute top-2 right-2 bg-amber-500">
                     Featured
                   </Badge>
@@ -288,10 +248,10 @@ export default function PublicShowcase() {
               <CardContent className="p-3 space-y-1">
                 <p className="font-medium text-sm truncate">{item.name}</p>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{item.category}</span>
+                  <span className="capitalize">{item.category}</span>
                   {item.color && (
                     <span className="flex items-center gap-1">
-                      <span 
+                      <span
                         className="w-3 h-3 rounded-full border"
                         style={{ backgroundColor: item.color.toLowerCase() }}
                       />
@@ -306,7 +266,7 @@ export default function PublicShowcase() {
           ))}
         </div>
 
-        {(!filteredItems || filteredItems.length === 0) && (
+        {filteredItems.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
             <p>No items to display</p>
@@ -340,4 +300,3 @@ export default function PublicShowcase() {
     </div>
   );
 }
-
