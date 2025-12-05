@@ -32,18 +32,25 @@ import { getDefaultCurrency } from '@/pages/Settings'
 import {
   AlertTriangle,
   Briefcase,
+  Camera,
   Copy,
   Footprints,
   Grid3X3,
+  History,
+  ImageIcon,
   Laptop,
+  Lightbulb,
   List,
   Loader2,
+  Mail,
   Package,
   Pencil,
   Plus,
   Ruler,
   Search,
   Shirt,
+  ShoppingBag,
+  Sparkles,
   Star,
   Trash2,
   Watch
@@ -524,19 +531,158 @@ export default function Inventory() {
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="text-center py-20">
-          <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <h3 className="text-xl font-semibold mb-2">No items found</h3>
-          <p className="text-muted-foreground mb-4">
-            {search || categoryFilter !== 'all' || conditionFilter !== 'all'
-              ? 'Try adjusting your filters'
-              : 'Start by adding your first item'}
-          </p>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Item
-          </Button>
-        </div>
+        search || categoryFilter !== 'all' || subcategoryFilter !== 'all' || conditionFilter !== 'all' ? (
+          // Filtered empty state - keep it simple
+          <div className="text-center py-20">
+            <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-xl font-semibold mb-2">No items match your filters</h3>
+            <p className="text-muted-foreground mb-4">
+              Try adjusting your search or filter criteria
+            </p>
+            <Button variant="outline" onClick={() => {
+              setSearch('')
+              setCategoryFilter('all')
+              setSubcategoryFilter('all')
+              setConditionFilter('all')
+            }} className="gap-2">
+              Clear Filters
+            </Button>
+          </div>
+        ) : (
+          // True empty state - show onboarding hints
+          <div className="py-12 md:py-16">
+            {/* Main empty state header */}
+            <div className="text-center mb-10 md:mb-12">
+              <div className="relative inline-block mb-6">
+                <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-amber-500/10 flex items-center justify-center">
+                  <Package className="h-10 w-10 text-primary/60" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-secondary border-2 border-background flex items-center justify-center">
+                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-semibold mb-2">Your wardrobe awaits</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Building your inventory takes a moment, but pays off forever. Here are some ways to get started:
+              </p>
+            </div>
+
+            {/* Hint label */}
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Lightbulb className="h-4 w-4 text-muted-foreground/50" />
+              <span className="text-xs uppercase tracking-wider text-muted-foreground/50 font-medium">Quick start ideas</span>
+            </div>
+
+            {/* Suggestion cards - greyed out, non-interactive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto mb-10">
+              {/* Hint 1: Order History */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <History className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Check order history</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Visit Amazon, Zara, H&M or your favorite stores. Your purchase history has images ready to save.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint 2: Google Images */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Google your items</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Search "Nike Air Max 90 White" on Google Images. Find the exact product photo in seconds.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint 3: Photo from closet */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <Camera className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Snap from your closet</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Lay items flat or hang them up. Good lighting + white background = catalog-worthy photos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint 4: Email receipts */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <Mail className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Dig through emails</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Search "order confirmation" in Gmail. Product images are often right there in the email.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint 5: Start with one category */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Start with one category</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Don't overwhelm yourself. Add all your shoes first, then move to shirts. Small wins build momentum.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hint 6: Brand websites */}
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+                <div className="flex items-start gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <Shirt className="h-5 w-5 text-muted-foreground/60" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground/70 mb-1">Visit brand websites</h4>
+                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
+                      Uniqlo, Levi's, Adidas — brands keep product pages live. Find your exact item with pro photos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pro tip */}
+            <div className="max-w-lg mx-auto mb-8 p-4 rounded-lg bg-primary/5 border border-primary/10">
+              <p className="text-sm text-center text-muted-foreground">
+                <span className="text-primary font-medium">Pro tip:</span> Start with items you wear most often. 
+                You can always add the rest later — even a partial inventory helps with outfit planning.
+              </p>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center">
+              <Button onClick={() => setIsAddDialogOpen(true)} size="lg" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Your First Item
+              </Button>
+            </div>
+          </div>
+        )
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {filteredItems.map((item) => {

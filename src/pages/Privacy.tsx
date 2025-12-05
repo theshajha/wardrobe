@@ -252,7 +252,15 @@ export default function Privacy() {
         {/* Footer */}
         <footer className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
-            © 2025 Fitso.me · Built with privacy first 🔒
+            © 2025 Fitso.me · Built with privacy first 🔒 ·{' '}
+            <a
+              href="https://theshajha.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              Built by Shashank
+            </a>
           </p>
         </footer>
       </main>

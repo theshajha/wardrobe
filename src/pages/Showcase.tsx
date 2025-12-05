@@ -189,7 +189,7 @@ export default function Showcase() {
                         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
                     </div>
                 ) : featuredItems.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                         {featuredItems.map(item => {
                             const Icon = categoryIcons[item.category] || Package
 
@@ -200,9 +200,9 @@ export default function Showcase() {
                                     onClick={() => toggleFeatured(item)}
                                 >
                                     <div className="aspect-square relative">
-                                        {item.imageRef ? (
+                                        {(item.imageData || item.imageRef) ? (
                                             <img
-                                                src={getImageUrl(item.imageRef) || ''}
+                                                src={item.imageData || getImageUrl(item.imageRef) || ''}
                                                 alt={item.name}
                                                 className="w-full h-full object-cover"
                                             />
@@ -258,7 +258,7 @@ export default function Showcase() {
                         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
                     </div>
                 ) : nonFeaturedItems.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                         {nonFeaturedItems.map(item => {
                             const Icon = categoryIcons[item.category] || Package
 
@@ -269,9 +269,9 @@ export default function Showcase() {
                                     onClick={() => toggleFeatured(item)}
                                 >
                                     <div className="aspect-square relative">
-                                        {item.imageRef ? (
+                                        {(item.imageData || item.imageRef) ? (
                                             <img
-                                                src={getImageUrl(item.imageRef) || ''}
+                                                src={item.imageData || getImageUrl(item.imageRef) || ''}
                                                 alt={item.name}
                                                 className="w-full h-full object-cover"
                                             />
