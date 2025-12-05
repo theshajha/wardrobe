@@ -23,10 +23,13 @@ export interface AuthResult {
  */
 export async function sendMagicLink(email: string): Promise<AuthResult> {
   try {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    console.log('[Auth] Magic link redirect URL:', redirectUrl);
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -61,6 +64,9 @@ export async function signUp(email: string, password?: string): Promise<AuthResu
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       if (error) {

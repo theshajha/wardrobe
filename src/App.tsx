@@ -11,7 +11,7 @@ import { isDemoMode } from './lib/demo'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
-import LandingNew from './pages/LandingNew'
+import Landing from './pages/Landing'
 import Outfits from './pages/Outfits'
 import Packing from './pages/Packing'
 import PhaseOut from './pages/PhaseOut'
@@ -61,7 +61,7 @@ export default function App() {
                     <Toaster position="top-right" richColors closeButton theme="dark" />
                     <div className="min-h-screen pattern-dots">
                         <Routes>
-                            <Route path="/" element={<LandingNew />} />
+                            <Route path="/" element={<Landing />} />
                         </Routes>
                     </div>
                 </AnalyticsProvider>
