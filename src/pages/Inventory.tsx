@@ -1,4 +1,5 @@
 import { ImageUpload } from '@/components/ImageUpload'
+import { ImportWizard } from '@/components/ImportWizard'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { type Item } from '@/db'
 import { useItems } from '@/hooks/useItems'
+import { isDemoMode } from '@/lib/demo'
 import { getImageUrl } from '@/lib/imageUrl'
+import { detectSizeType } from '@/lib/importers'
 import {
   CATEGORIES,
   CLIMATES,
@@ -34,6 +37,7 @@ import {
   Briefcase,
   Camera,
   Copy,
+  Download,
   Footprints,
   Grid3X3,
   History,
@@ -285,8 +289,10 @@ export default function Inventory() {
   }, [])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isImportWizardOpen, setIsImportWizardOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [deleteItem, setDeleteItem] = useState<Item | null>(null)
+  const isDemo = isDemoMode()
 
   const getInitialFormData = () => ({
     name: '',
@@ -457,10 +463,20 @@ export default function Inventory() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory</h1>
           <p className="text-muted-foreground text-sm md:text-base hidden sm:block">Manage all your belongings in one place</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 shrink-0">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Add Item</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsImportWizardOpen(true)}
+            className="gap-2 shrink-0"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Import</span>
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 shrink-0">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Item</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -563,122 +579,117 @@ export default function Inventory() {
               </div>
               <h3 className="text-2xl font-semibold mb-2">Your wardrobe awaits</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Building your inventory takes a moment, but pays off forever. Here are some ways to get started:
+                {!isDemo
+                  ? "The fastest way to build your inventory? Import from your order history."
+                  : "Building your inventory takes a moment, but pays off forever. Here's how to start:"}
               </p>
             </div>
 
-            {/* Hint label */}
+            {!isDemo && (
+              <div className="max-w-2xl mx-auto mb-8">
+                <div
+                  className="group p-6 rounded-xl border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10 cursor-pointer hover:border-primary/80 hover:shadow-lg transition-all"
+                  onClick={() => setIsImportWizardOpen(true)}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 shadow-sm">
+                      <Download className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-foreground text-lg">Import from Myntra or Ajio</h4>
+                        <Badge variant="secondary" className="text-[10px] px-2 py-0">Recommended</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Automatically import dozens of items in minutes. We'll pull product images, names, brands, sizes, and prices directly from your order history.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-primary font-medium group-hover:gap-2 transition-all">
+                          Start importing <ArrowRight className="h-4 w-4" />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-2 mb-6">
               <Lightbulb className="h-4 w-4 text-muted-foreground/50" />
-              <span className="text-xs uppercase tracking-wider text-muted-foreground/50 font-medium">Quick start ideas</span>
+              <span className="text-xs uppercase tracking-wider text-muted-foreground/50 font-medium">
+                {!isDemo ? "Other ways to add items" : "Quick start ideas"}
+              </span>
             </div>
 
-            {/* Suggestion cards - greyed out, non-interactive */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto mb-10">
-              {/* Hint 1: Order History */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+              <div
+                className="group p-5 rounded-xl border border-muted-foreground/20 bg-secondary/10 hover:bg-secondary/20 hover:border-muted-foreground/30 transition-all cursor-pointer"
+                onClick={() => setIsAddDialogOpen(true)}
+              >
                 <div className="flex items-start gap-4">
                   <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                    <History className="h-5 w-5 text-muted-foreground/60" />
+                    <Plus className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Check order history</h4>
-                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Visit Amazon, Zara, H&M or your favorite stores. Your purchase history has images ready to save.
+                    <h4 className="font-medium text-foreground mb-1">Add items manually</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Perfect for unique pieces. Upload photos from your camera roll or paste image URLs.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Hint 2: Google Images */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/10 hover:bg-secondary/20 transition-opacity">
                 <div className="flex items-start gap-4">
                   <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
                     <ImageIcon className="h-5 w-5 text-muted-foreground/60" />
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Google your items</h4>
+                    <h4 className="font-medium text-foreground/70 mb-1">Search product images</h4>
                     <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Search "Nike Air Max 90 White" on Google Images. Find the exact product photo in seconds.
+                      Google "Nike Air Max 90 White" to find official product photos in seconds.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Hint 3: Photo from closet */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
+              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/10 hover:bg-secondary/20 transition-opacity">
                 <div className="flex items-start gap-4">
                   <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
                     <Camera className="h-5 w-5 text-muted-foreground/60" />
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Snap from your closet</h4>
+                    <h4 className="font-medium text-foreground/70 mb-1">Take your own photos</h4>
                     <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Lay items flat or hang them up. Good lighting + white background = catalog-worthy photos.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hint 4: Email receipts */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
-                <div className="flex items-start gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                    <Mail className="h-5 w-5 text-muted-foreground/60" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Dig through emails</h4>
-                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Search "order confirmation" in Gmail. Product images are often right there in the email.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hint 5: Start with one category */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
-                <div className="flex items-start gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                    <ShoppingBag className="h-5 w-5 text-muted-foreground/60" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Start with one category</h4>
-                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Don't overwhelm yourself. Add all your shoes first, then move to shirts. Small wins build momentum.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hint 6: Brand websites */}
-              <div className="group p-5 rounded-xl border border-dashed border-muted-foreground/20 bg-secondary/20 opacity-60 hover:opacity-75 transition-opacity">
-                <div className="flex items-start gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                    <Shirt className="h-5 w-5 text-muted-foreground/60" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground/70 mb-1">Visit brand websites</h4>
-                    <p className="text-sm text-muted-foreground/60 leading-relaxed">
-                      Uniqlo, Levi's, Adidas — brands keep product pages live. Find your exact item with pro photos.
+                      Lay items flat with good lighting. A simple phone photo works great!
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Pro tip */}
-            <div className="max-w-lg mx-auto mb-8 p-4 rounded-lg bg-primary/5 border border-primary/10">
+            <div className="max-w-lg mx-auto mb-8 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
               <p className="text-sm text-center text-muted-foreground">
-                <span className="text-primary font-medium">Pro tip:</span> Start with items you wear most often. 
-                You can always add the rest later — even a partial inventory helps with outfit planning.
+                <span className="text-amber-600 dark:text-amber-400 font-medium">💡 Pro tip:</span> Start with items you wear most often.
+                Even a partial inventory helps with outfit planning — you can always add more later.
               </p>
             </div>
 
-            {/* CTA */}
-            <div className="text-center">
-              <Button onClick={() => setIsAddDialogOpen(true)} size="lg" className="gap-2">
+            <div className="text-center flex flex-col sm:flex-row items-center justify-center gap-3">
+              {!isDemo && (
+                <Button onClick={() => setIsImportWizardOpen(true)} size="lg" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Import Items
+                </Button>
+              )}
+              <Button
+                onClick={() => setIsAddDialogOpen(true)}
+                size="lg"
+                variant={!isDemo ? "outline" : "default"}
+                className="gap-2"
+              >
                 <Plus className="h-4 w-4" />
-                Add Your First Item
+                Add Manually
               </Button>
             </div>
           </div>
@@ -710,9 +721,7 @@ export default function Inventory() {
                     </div>
                   )}
 
-                  {/* Action buttons overlay - always visible on mobile, hover on desktop */}
                   <div className="absolute inset-x-0 top-0 p-1.5 md:p-2 flex justify-between items-start md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    {/* Left: Star button */}
                     <Button
                       variant="secondary"
                       size="icon"
@@ -726,7 +735,6 @@ export default function Inventory() {
                       <Star className={cn("h-3.5 w-3.5 md:h-4 md:w-4", item.isFeatured && "fill-current")} />
                     </Button>
 
-                    {/* Right: Copy and Edit buttons */}
                     <div className="flex gap-1">
                       <Button
                         variant="secondary"
@@ -749,7 +757,6 @@ export default function Inventory() {
                     </div>
                   </div>
 
-                  {/* Featured indicator (always visible when featured) */}
                   {item.isFeatured && (
                     <div className="absolute bottom-1.5 left-1.5 md:bottom-2 md:left-2">
                       <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-amber-500 flex items-center justify-center shadow-lg">
@@ -1117,6 +1124,33 @@ export default function Inventory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportWizard
+        open={isImportWizardOpen}
+        onOpenChange={setIsImportWizardOpen}
+        existingItems={items.map(item => ({ name: item.name, brand: item.brand, id: item.id }))}
+        onImport={async (importedItems) => {
+          for (const item of importedItems) {
+            await addItemToStore({
+              name: item.name,
+              category: item.category,
+              subcategory: item.subcategory,
+              brand: item.brand,
+              color: item.color,
+              purchaseDate: item.purchaseDate,
+              cost: item.cost,
+              currency: item.currency || 'INR',
+              condition: 'good',
+              location: 'home',
+              isPhaseOut: false,
+              isFeatured: false,
+              imageData: item.imageData,
+              size: item.size ? detectSizeType(item.size, item.category) : undefined,
+            })
+          }
+          toast.success(`Imported ${importedItems.length} items to your inventory!`)
+        }}
+      />
     </div>
   )
 }
