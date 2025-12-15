@@ -14,6 +14,14 @@ All your data stays private and secure in your browser — no servers, no cloud,
 
 ## ✨ Features
 
+### 🔄 Smart Import (NEW!)
+- **One-click import from Myntra & Ajio** — Import dozens of items from your order history in minutes
+- **Automatic data extraction** — Product images, names, brands, sizes, and prices pulled automatically
+- **Smart category detection** — AI-powered categorization of imported items
+- **Duplicate detection** — Identifies items you already have in your inventory
+- **Retry logic** — Handles network errors gracefully with automatic retries
+- **Privacy-focused** — Images are proxied through a secure server, no data stored
+
 ### 📦 Inventory Management
 - Add unlimited items with photos, sizes, brands, colors, and notes
 - Smart size system that adapts to item type (clothing, shoes, bags, watches)
@@ -67,29 +75,47 @@ All your data stays private and secure in your browser — no servers, no cloud,
 
 ## 🔒 Privacy First
 
-- **No server communication** — runs entirely in your browser
-- **No analytics or tracking** — we don't collect any data
-- **No accounts required** — start using immediately
-- **Offline-capable** — works without internet
-- **You control your data** — export anytime
+- **Local-first architecture** — All your data stays in your browser (IndexedDB)
+- **No analytics or tracking** — We don't collect any personal data
+- **No accounts required** — Start using immediately (optional sign-up for sync)
+- **Offline-capable** — Works without internet (except for imports)
+- **You control your data** — Export anytime, delete anytime
+- **Secure image proxy** — Import feature uses a privacy-respecting proxy (images not stored on server)
 
 ## 🛠️ Tech Stack
 
+### Frontend
 - **React 18** + **TypeScript** — Modern, type-safe UI
 - **Vite** — Lightning-fast development
 - **Tailwind CSS** — Beautiful styling
 - **Radix UI** — Accessible components
-- **Dexie.js** — IndexedDB made easy
+- **Dexie.js** — IndexedDB for local storage
 - **Lucide** — Gorgeous icons
+
+### Backend (Optional - for sync & import)
+- **Cloudflare Workers** — Edge computing for image proxy
+- **Supabase** — Authentication & cloud sync
+- **Hono** — Lightweight web framework
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### For Users
+
+Just visit [fitso.me](https://fitso.me) and start using the app! No installation needed.
+
+**Quick Start:**
+1. Click "Import Items" to import from Myntra or Ajio (fastest way!)
+2. Or click "Add Manually" to add items one by one
+3. Start creating outfits, packing lists, and showcasing your style
+
+### For Developers
+
+#### Prerequisites
 
 - Node.js v16 or higher
 - npm or yarn
 
-### Installation
+#### Installation
 
 ```bash
 # Clone the repository
@@ -105,11 +131,47 @@ npm run dev
 
 Open `http://localhost:5173` in your browser.
 
+#### Setting Up Cloud Sync & Import (Optional)
+
+The import feature requires a Cloudflare Worker for the image proxy:
+
+```bash
+cd workers
+
+# Install dependencies
+npm install
+
+# Configure Supabase credentials
+# Copy workers/.dev.vars.example to workers/.dev.vars and fill in your credentials
+
+# Deploy worker
+npm run deploy
+```
+
 ### Build for Production
 
 ```bash
+# Build frontend
 npm run build
+
+# Build and deploy worker (if using sync/import features)
+cd workers
+npm run deploy
 ```
+
+## 🎯 How the Import Feature Works
+
+The import feature uses a clever bookmarklet approach:
+
+1. **User drags a bookmarklet** to their browser's bookmarks bar
+2. **Opens Myntra/Ajio orders page** and scrolls to load items
+3. **Clicks the bookmarklet** which runs JavaScript to extract order data from the DOM
+4. **Data is copied to clipboard** in a structured JSON format
+5. **User pastes into the app** which processes and displays items
+6. **Images are downloaded** through a privacy-respecting proxy
+7. **Items are saved locally** with smart size detection and duplicate checking
+
+**Supported stores:** Myntra, Ajio (more coming soon!)
 
 ## 📱 Browser Support
 

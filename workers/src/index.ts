@@ -11,6 +11,7 @@ import { syncRouter } from './routes/sync';
 import { imagesRouter } from './routes/images';
 import { publicRouter } from './routes/public';
 import { migrationRouter } from './routes/migration';
+import { proxyRouter } from './routes/proxy';
 import { verifySession } from './utils/auth';
 
 // Create Hono app with Env type
@@ -84,6 +85,26 @@ app.use('/images/*', async (c, next) => {
 // Protected routes
 app.route('/sync', syncRouter);
 app.route('/images', imagesRouter);
+
+// Proxy routes (protected - requires auth)
+app.use('/proxy/*', async (c, next) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const token = authHeader.slice(7);
+  const session = await verifySession(token, c.env);
+  
+  if (!session) {
+    return c.json({ error: 'Invalid or expired session' }, 401);
+  }
+
+  c.set('session', session);
+  return next();
+});
+
+app.route('/proxy', proxyRouter);
 
 // 404 handler
 app.notFound((c) => {
