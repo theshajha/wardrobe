@@ -183,6 +183,14 @@ The import feature uses a clever bookmarklet approach:
 | Safari 14+ | ✅ Full |
 | Mobile browsers | ✅ Full |
 
+## 📚 Documentation
+
+Detailed technical documentation is available in the `/docs` directory:
+
+- **[E-Commerce Integration](docs/ECOMMERCE_INTEGRATION.md)** - Complete guide to the import feature, technical architecture, and adding new store integrations
+- **[PostHog Analytics](docs/POSTHOG_ANALYTICS.md)** - Analytics setup and event tracking
+- **[Supabase Email Template](docs/SUPABASE_EMAIL_TEMPLATE.md)** - Email configuration for magic link authentication
+
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
