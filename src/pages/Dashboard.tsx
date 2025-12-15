@@ -1,3 +1,4 @@
+import { FestivalCountdown } from '@/components/FestivalCountdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -185,6 +186,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Festival Countdown - Shows upcoming festivals */}
+      <FestivalCountdown maxDays={60} />
 
       {/* Categories Overview + Recently Added */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

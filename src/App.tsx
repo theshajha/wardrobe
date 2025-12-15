@@ -10,6 +10,8 @@ import { useAnalytics } from './hooks/useAnalytics'
 import { isDemoMode } from './lib/demo'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
+import GuidePage from './pages/GuidePage'
+import GuidesIndex from './pages/GuidesIndex'
 import Inventory from './pages/Inventory'
 import Landing from './pages/Landing'
 import Outfits from './pages/Outfits'
@@ -47,8 +49,10 @@ export default function App() {
     const isLandingPage = location.pathname === '/'
     const isAuthPage = location.pathname.startsWith('/auth') || location.pathname === '/profile-setup'
     const isPrivacyPage = location.pathname === '/privacy'
+    const isGuidesIndex = location.pathname === '/guides'
+    const isGuidePage = location.pathname.startsWith('/guides/')
     // Check if this is a public profile page (single path segment that's not a known route)
-    const knownRoutes = ['dashboard', 'inventory', 'showcase', 'packing', 'outfits', 'phase-out', 'wishlist', 'settings', 'auth', 'privacy', 'profile-setup']
+    const knownRoutes = ['dashboard', 'inventory', 'showcase', 'packing', 'outfits', 'phase-out', 'wishlist', 'settings', 'auth', 'privacy', 'profile-setup', 'guides']
     const pathSegments = location.pathname.split('/').filter(Boolean)
     const isPublicProfile = pathSegments.length === 1 && !knownRoutes.includes(pathSegments[0])
     const isDemo = isDemoMode()
@@ -92,6 +96,34 @@ export default function App() {
                     <Toaster position="top-right" richColors closeButton theme="dark" />
                     <Routes>
                         <Route path="/privacy" element={<Privacy />} />
+                    </Routes>
+                </AnalyticsProvider>
+            </AuthProvider>
+        )
+    }
+
+    // Guides index page without sidebar (SEO content)
+    if (isGuidesIndex) {
+        return (
+            <AuthProvider>
+                <AnalyticsProvider>
+                    <Toaster position="top-right" richColors closeButton theme="dark" />
+                    <Routes>
+                        <Route path="/guides" element={<GuidesIndex />} />
+                    </Routes>
+                </AnalyticsProvider>
+            </AuthProvider>
+        )
+    }
+
+    // Guide pages without sidebar (SEO content)
+    if (isGuidePage) {
+        return (
+            <AuthProvider>
+                <AnalyticsProvider>
+                    <Toaster position="top-right" richColors closeButton theme="dark" />
+                    <Routes>
+                        <Route path="/guides/:slug" element={<GuidePage />} />
                     </Routes>
                 </AnalyticsProvider>
             </AuthProvider>
