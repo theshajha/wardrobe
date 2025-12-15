@@ -7,6 +7,7 @@ export * from './types';
 import { COMMON_BRANDS, detectCategory, extractBrand, extractColor } from './categoryDetection';
 import { getStoreById } from './stores';
 import type { ClipboardImportData, ImportedItem, StoreId } from './types';
+import type { SizeInfo, SizeType } from '@/lib/utils';
 
 export function parseClipboardData(text: string): ClipboardImportData | null {
   try {
@@ -176,49 +177,49 @@ export function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-export function detectSizeType(sizeValue: string, category: string): { type: string; value: string } | undefined {
+export function detectSizeType(sizeValue: string, category: string): SizeInfo | undefined {
   if (!sizeValue) return undefined;
 
   const trimmedSize = sizeValue.trim();
 
   if (category === 'footwear') {
     if (/^\d+(\.\d+)?$/.test(trimmedSize)) {
-      return { type: 'shoe', value: trimmedSize, system: 'us' };
+      return { type: 'shoe' as SizeType, value: trimmedSize, system: 'us' };
     }
   }
 
   if (category === 'accessories') {
     if (/^\d+mm$/i.test(trimmedSize)) {
-      return { type: 'watch', value: trimmedSize.replace(/mm$/i, '') };
+      return { type: 'watch' as SizeType, value: trimmedSize.replace(/mm$/i, '') };
     }
   }
 
   if (category === 'bags') {
     if (/^\d+L$/i.test(trimmedSize)) {
-      return { type: 'dimensions', capacity: parseInt(trimmedSize) };
+      return { type: 'dimensions' as SizeType, capacity: parseInt(trimmedSize) };
     }
   }
 
   if (/^[XS|S|M|L|XL|XXL|XXXL]+$/i.test(trimmedSize)) {
-    return { type: 'letter', value: trimmedSize.toUpperCase() };
+    return { type: 'letter' as SizeType, value: trimmedSize.toUpperCase() };
   }
 
   if (/^\d+$/.test(trimmedSize)) {
     const size = parseInt(trimmedSize);
     if (size >= 24 && size <= 60) {
-      return { type: 'numeric', value: trimmedSize };
+      return { type: 'numeric' as SizeType, value: trimmedSize };
     }
     if (size >= 4 && size <= 20) {
-      return { type: 'shoe', value: trimmedSize, system: 'us' };
+      return { type: 'shoe' as SizeType, value: trimmedSize, system: 'us' };
     }
   }
 
   if (/^\d+x\d+$/i.test(trimmedSize)) {
     const [waist, inseam] = trimmedSize.split('x');
-    return { type: 'waist-inseam', waist, inseam };
+    return { type: 'waist-inseam' as SizeType, waist, inseam };
   }
 
-  return { type: 'letter', value: trimmedSize };
+  return { type: 'letter' as SizeType, value: trimmedSize };
 }
 
 export function normalizeString(str: string): string {
