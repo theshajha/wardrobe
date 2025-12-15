@@ -23,7 +23,8 @@ export interface AuthResult {
  */
 export async function sendMagicLink(email: string): Promise<AuthResult> {
   try {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const redirectUrl = `${baseUrl}/auth/callback`;
     console.log('[Auth] Magic link redirect URL:', redirectUrl);
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -61,11 +62,13 @@ export async function sendMagicLink(email: string): Promise<AuthResult> {
 export async function signUp(email: string, password?: string): Promise<AuthResult> {
   try {
     if (password) {
+      // Use configured app URL if available, otherwise fall back to current origin
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${baseUrl}/auth/callback`,
         },
       });
 
